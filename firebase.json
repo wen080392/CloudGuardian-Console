@@ -1,0 +1,8 @@
+{
+  "firestore": {
+    "databaseId": "ai-studio-cloudguardiancon-f86cafc7-8a70-444c-9521-e53f28b26174",
+    "rules": "firestore.rules",
+    "edition": "ENTERPRISE",
+    "dataAccessMode": "FIRESTORE_NATIVE"
+  }
+}

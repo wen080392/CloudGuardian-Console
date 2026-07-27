@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+build/
+
+# Database
+dev.db
+*.sqlite
+/lib/generated/prisma
+
+# Logs
+*.log
+tunnel.log
+keep-tunnel.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+serviceAccountKey.json
+*.pem
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+uploads/

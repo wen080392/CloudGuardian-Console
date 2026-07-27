@@ -1,0 +1,13 @@
+{
+  "projectId": "paineldeanalisedevendas",
+  "appId": "1:896077210163:web:42b52bd7dba9caf4193946",
+  "apiKey": "AIzaSyD6s84HqXda1Tlr8UJ3pzq7IaKF8w_dgYw",
+  "authDomain": "paineldeanalisedevendas.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-cloudguardiancon-f86cafc7-8a70-444c-9521-e53f28b26174",
+  "storageBucket": "paineldeanalisedevendas.firebasestorage.app",
+  "messagingSenderId": "896077210163",
+  "measurementId": "G-H41E36JXJT",
+  "oAuthClientId": "520635261079-uh8d22mjn8dg2hfqo0dahm5p7sf21gvq.apps.googleusercontent.com",
+  "recaptchaSiteKey": "",
+  "databaseURL": "https://paineldeanalisedevendas-default-rtdb.firebaseio.com"
+}

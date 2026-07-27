@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: 'Inter', sans-serif; color: #1a1a1a; padding: 40px; background: white; }
+    .header { display: flex; justify-content: space-between; border-bottom: 3px solid #2563eb; padding-bottom: 20px; margin-bottom: 30px; }
+    .logo { font-size: 28px; font-weight: 800; color: #2563eb; }
+    .logo span { color: #7c3aed; }
+    .badge { background: #10b981; color: white; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; }
+    .report-title { font-size: 32px; font-weight: 800; }
+    .report-subtitle { color: #6b7280; font-size: 18px; margin-bottom: 30px; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; background: #f9fafb; padding: 24px; border-radius: 12px; margin-bottom: 30px; }
+    .info-item { display: flex; flex-direction: column; }
+    .info-label { font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; }
+    .info-value { font-size: 16px; font-weight: 600; margin-top: 4px; }
+    .charts { display: flex; gap: 40px; margin-bottom: 30px; justify-content: center; }
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 30px; }
+    .stat-card { background: #f9fafb; padding: 16px; border-radius: 12px; text-align: center; }
+    .stat-number { font-size: 24px; font-weight: 700; }
+    .stat-label { font-size: 12px; color: #6b7280; }
+    .findings { background: #fef2f2; border-left: 4px solid #ef4444; padding: 16px; border-radius: 8px; margin-bottom: 30px; }
+    .finding { margin-bottom: 12px; }
+    .finding h4 { margin: 0; font-size: 14px; color: #991b1b; }
+    .finding p { margin: 4px 0 0; font-size: 13px; color: #4b5563; }
+    .footer { margin-top: 40px; border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center; color: #6b7280; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">Cloud<span>Guardian</span></div>
+    <div class="badge">{{summary.complianceScore}}%</div>
+  </div>
+  <div class="report-title">{{title}}</div>
+  <div class="report-subtitle">{{framework}} • {{period}} • Gerado em {{generatedAt}}</div>
+
+  <div class="info-grid">
+    <div class="info-item"><span class="info-label">Empresa</span><span class="info-value">{{company}}</span></div>
+    <div class="info-item"><span class="info-label">Período</span><span class="info-value">{{period}}</span></div>
+    <div class="info-item"><span class="info-label">Framework</span><span class="info-value">{{framework}}</span></div>
+    <div class="info-item"><span class="info-label">Pontuação</span><span class="info-value">{{summary.complianceScore}}%</span></div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-number">{{summary.totalVulnerabilities}}</div><div class="stat-label">Total Vulnerabilidades</div></div>
+    <div class="stat-card"><div class="stat-number" style="color:#ef4444;">{{summary.criticalVulnerabilities}}</div><div class="stat-label">Críticas</div></div>
+    <div class="stat-card"><div class="stat-number" style="color:#f97316;">{{summary.highVulnerabilities}}</div><div class="stat-label">Altas</div></div>
+    <div class="stat-card"><div class="stat-number" style="color:#10b981;">{{summary.resolvedVulnerabilities}}</div><div class="stat-label">Corrigidas</div></div>
+  </div>
+
+  <div class="charts">
+    <div>
+      <h3 style="text-align:center;">Distribuição de Severidade</h3>
+      {{{chartSeverity}}}
+    </div>
+    <div>
+      <h3 style="text-align:center;">Evolução Mensal</h3>
+      {{{chartTrend}}}
+    </div>
+  </div>
+
+  {{#if findings.length}}
+  <div class="findings">
+    <h3 style="margin-top:0; color:#991b1b;">🔍 Achados e Recomendações</h3>
+    {{#each findings}}
+    <div class="finding">
+      <h4>{{severity}} - {{description}}</h4>
+      <p>{{recommendation}}</p>
+    </div>
+    {{/each}}
+  </div>
+  {{/if}}
+
+  <div class="footer">
+    CloudGuardian v2.0 • Relatório confidencial • Gerado automaticamente
+  </div>
+</body>
+</html>

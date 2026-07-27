@@ -1,0 +1,16 @@
+node_modules
+npm-debug.log
+.env
+.env.*
+dist
+build
+.git
+.gitignore
+README.md
+docs
+.vscode
+*.swp
+*.swo
+.DS_Store
+uploads
+serviceAccountKey.json

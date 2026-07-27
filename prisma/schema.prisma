@@ -1,0 +1,241 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Tenant {
+  id        String    @id @default(uuid())
+  name      String
+  users     User[]
+  projects         Project[]
+  policies         Policy[]
+  complianceReports ComplianceReport[]
+  notificationSetting NotificationSetting?
+  credentials      CloudCredential[]
+  auditLogs        AuditLog[]
+  createdAt        DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model User {
+  id          String   @id @default(uuid())
+  firebaseUid String?  @unique
+  email       String   @unique
+  name        String?
+  role        String   @default("viewer")
+  tenantId    String?
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  projects    Project[]
+}
+
+model Project {
+  id           String   @id @default(uuid())
+  name         String
+  cloud        String
+  region       String
+  status       String   @default("active")
+  score        Int      @default(100)
+  repoUrl      String?
+  githubRepoId String?
+  tenantId     String?
+  tenant       Tenant?  @relation(fields: [tenantId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  scans        Scan[]
+}
+
+model Scan {
+  id          String   @id @default(uuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id])
+  vulnsCount  Int      @default(0)
+  code        String?
+  fullCode    String?
+  status      String   @default("completed")
+  result      Json?
+  createdAt   DateTime @default(now())
+}
+
+model Asset {
+  id         String   @id @default(uuid())
+  name       String
+  type       String
+  category   String
+  provider   String
+  region     String
+  status     String   @default("running")
+  riskScore  Int      @default(0)
+  cost       Float    @default(0)
+  tags       Json?
+  tenantId   String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Vulnerability {
+  id          String   @id @default(uuid())
+  scanId      String?  
+  resourceId  String   
+  ruleId      String   
+  title       String
+  description String?
+  severity    String   
+  status      String   
+  filePath    String?  
+  line        Int?     
+  details     Json?    
+  tenantId    String
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CostAnalysis {
+  id          String   @id @default(uuid())
+  tenantId    String
+  period      String
+  startDate   DateTime
+  endDate     DateTime
+  totalCost   Float    @default(0)
+  projectedCost Float  @default(0)
+  savings     Float    @default(0)
+  efficiency  Float    @default(0)
+  resources   Json
+  services    Json
+  tags        Json
+  recommendations Json
+  createdAt   DateTime @default(now())
+}
+
+model BudgetAlert {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  description String?
+  threshold   Float
+  period      String
+  comparison  String
+  channels    String[]
+  recipients  String[]
+  enabled     Boolean  @default(true)
+  triggered   Boolean  @default(false)
+  triggeredAt DateTime?
+  currentSpend Float   @default(0)
+  lastChecked DateTime?
+}
+
+model Policy {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  type           String   // security, compliance, cost, custom
+  framework      String?  // CIS, SOC2, HIPAA, custom
+  severity       String   // critical, high, medium, low, info
+  regoCode       String   // Código Rego da política
+  enabled        Boolean  @default(true)
+  autoRemediate  Boolean  @default(false)
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  
+  passedCount    Int      @default(0)
+  failedCount    Int      @default(0)
+  lastEvaluated  DateTime?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  evaluations    PolicyEvaluation[]
+}
+
+model PolicyEvaluation {
+  id          String   @id @default(cuid())
+  policyId    String
+  policy      Policy   @relation(fields: [policyId], references: [id])
+  resourceId  String?
+  result      String   // pass, fail, error
+  details     Json?
+  evaluatedAt DateTime @default(now())
+  tenantId    String
+}
+
+model ComplianceReport {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  title       String
+  framework   String   // CIS, SOC2, HIPAA, GDPR
+  period      String   // "Mensal", "Trimestral", etc.
+  startDate   DateTime
+  endDate     DateTime
+  
+  summary     Json     // Resumo executivo (objeto com métricas)
+  controls    Json     // Lista de controles
+  metrics     Json     // Métricas detalhadas
+  findings    Json     // Achados e recomendações
+  
+  status      String   // draft, completed, published, archived
+  pdfUrl      String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model NotificationSetting {
+  id             String   @id @default(cuid())
+  tenantId       String   @unique
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+
+  slackWebhook   String?  
+  teamsWebhook   String?  
+  emailRecipients String[] 
+  enabledEvents  String[]  
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model CloudCredential {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
+  provider    String   // "aws", "gcp", "azure", "github"
+  roleArn     String?  
+  accessKey   String?  // Criptografado via KMS
+  secretKey   String?  // Criptografado via KMS
+  region      String?  
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, provider])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  userId      String?
+  action      String
+  resourceId  String?
+  resourceType String?
+  details     Json?
+  ipAddress   String?
+  userAgent   String?
+  
+  createdAt   DateTime @default(now())
+}
