@@ -27,12 +27,25 @@ renderiza sem crash. É o teste que teria pego o bug automaticamente.
 
 ## 8.3 E2E com Playwright
 
-`e2e/instantAudit.spec.ts` valida o **funil PLG** ponta a ponta no browser
-(Chromium), interceptando o endpoint público — **não precisa de backend/DB**:
-colar Terraform → rodar → ver score/severidades/regras → link do PDF; e a
-validação de email obrigatório. Rodam via `npm run test:e2e`; a config aponta
-para um Chromium pré-instalado quando disponível e, em CI, o job
-`e2e` roda `playwright install chromium`.
+Rodam via `npm run test:e2e`; a config aponta para um Chromium pré-instalado
+quando disponível e, em CI, o job `e2e` roda `playwright install chromium`.
+Nenhum teste precisa de backend/DB — as APIs são interceptadas.
+
+**`e2e/instantAudit.spec.ts` — funil PLG (público):** colar Terraform → rodar →
+ver score/severidades/regras → link do PDF; e a validação de email obrigatório.
+
+**`e2e/authenticatedFlow.spec.ts` — fluxo core (Login → Scan → Auto-Fix):**
+Firebase e o banco são "mockados" sem infra externa:
+- **Auth**: o teste semeia `localStorage['user_data']` antes do load. O
+  `AuthProvider` inicializa `user` a partir daí e `isAuthenticated = !!user`,
+  então o console autenticado renderiza **sem tocar no Firebase**.
+- **API/DB**: todas as chamadas `/api/v1/**` são interceptadas (catch-all vazio
+  + um mock específico para `POST /scans`).
+
+O teste carrega o console autenticado (sem passar pela LandingPage), navega ao
+Scanner, roda o scan, vê as vulnerabilidades e dispara o Auto-Fix até o
+DiffViewer da IA. É exatamente o caminho que blinda as integrações vitais
+contra regressões — o crash `resource/resourceId` teria sido pego aqui.
 
 ### Segundo bug de tela branca encontrado (independente do reportado)
 

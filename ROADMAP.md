@@ -53,6 +53,7 @@
 - [x] Runner do Checkov isolado também no fluxo de repositório (webhook de PR).
 - [x] Teste de regressão da "tela preta" (resource/resourceId).
 - [x] E2E do funil PLG com Playwright + job de CI.
+- [x] E2E do fluxo core autenticado (Login → Scan → Auto-Fix), Firebase/DB mockados.
 - [x] Correção de 2º crash de boot: cliente Gemini agora é lazy (chave opcional).
 - [x] Frontend migrado do Tailwind CDN para Tailwind compilado (PostCSS/Vite).
 
