@@ -257,6 +257,25 @@ model CloudCredential {
   @@unique([tenantId, provider])
 }
 
+model Drift {
+  id           String   @id @default(uuid())
+  tenantId     String
+  projectId    String?
+  resource     String   // endereço do recurso (ex.: aws_s3_bucket.assets)
+  driftType    String   // update | delete | create
+  provider     String?  // aws | gcp | azure
+  severity     String   @default("medium")
+  status       String   @default("detected") // detected | resolved | ignored
+  expected     Json?    // estado desejado (do IaC)
+  actual       Json?    // estado real (da cloud)
+  source       String   @default("terraform-refresh") // terraform-refresh | derived
+  detectedAt   DateTime @default(now())
+  resolvedAt   DateTime?
+
+  @@index([tenantId, status])
+  @@index([projectId])
+}
+
 model AuditLog {
   id          String   @id @default(uuid())
   tenantId    String

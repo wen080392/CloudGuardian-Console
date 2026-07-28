@@ -37,4 +37,27 @@ cron.schedule('0 0 * * 0', async () => {
   console.log('📅 Geração de relatórios semanais...');
 });
 
-console.log('⏰ Scheduler de relatórios iniciado.');
+// Detecção de drift diária (03:00) — só roda de fato se terraform estiver
+// disponível no runner; caso contrário registra e sai sem fabricar dados.
+cron.schedule('0 3 * * *', async () => {
+  const { driftService } = await import('./driftService');
+  if (!(await driftService.terraformAvailable())) {
+    console.log('⏭️ Drift check pulado: terraform não disponível no runner.');
+    return;
+  }
+  console.log('🔍 Iniciando detecção de drift agendada...');
+  const projects = await prisma.project.findMany({ where: { repoUrl: { not: null } } });
+  for (const project of projects) {
+    try {
+      await driftService.detectDrift({
+        tenantId: project.tenantId,
+        projectId: project.id,
+        repoUrl: project.repoUrl as string,
+      });
+    } catch (e) {
+      console.error(`Drift check falhou para projeto ${project.id}:`, e);
+    }
+  }
+});
+
+console.log('⏰ Scheduler de relatórios e drift iniciado.');
