@@ -72,6 +72,7 @@ model Scan {
   code        String?
   fullCode    String?
   status      String   @default("pending")
+  engine      String?  // checkov | checkov-docker | native
   result      Json?
   error       String?
   startedAt   DateTime?

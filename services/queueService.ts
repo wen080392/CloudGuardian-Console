@@ -1,13 +1,17 @@
 import { scannerService } from './scannerService';
 import { prisma } from './db';
 import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import util from 'util';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { App } from 'octokit';
 import { ReportService } from './reportService';
 import { uploadPDF } from './storageService';
 
-const execPromise = util.promisify(exec);
+const execFilePromise = util.promisify(execFile);
+const mkdtempPromise = util.promisify(fs.mkdtemp);
+const rmPromise = util.promisify(fs.rm);
 const reportService = new ReportService();
 
 // Fila em Memória
@@ -78,16 +82,25 @@ const processQueue = async () => {
 // Worker de Scan
 async function processScanJob(data: any) {
   const { scanId, projectId, tenantId, repoFullName, prNumber, installationId, repoUrl } = data;
+  let repoPath = '';
   try {
-    await prisma.scan.update({ where: { id: scanId }, data: { status: 'running' } });
+    await prisma.scan.update({ where: { id: scanId }, data: { status: 'running', startedAt: new Date() } });
 
-    const repoPath = `/tmp/${repoFullName?.replace('/', '_')}_${prNumber}_${Date.now()}`;
-    await execPromise(`rm -rf ${repoPath}`);
-    await execPromise(`git clone ${repoUrl}.git ${repoPath}`);
-    await execPromise(`git -C ${repoPath} fetch origin pull/${prNumber}/head:pr-${prNumber}`);
-    await execPromise(`git -C ${repoPath} checkout pr-${prNumber}`);
+    // Valida entradas antes de tocar no shell (evita command injection via payload)
+    const pr = Number(prNumber);
+    if (!Number.isInteger(pr) || pr <= 0) throw new Error('prNumber inválido');
+    if (typeof repoUrl !== 'string' || !/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+$/.test(repoUrl)) {
+      throw new Error('repoUrl inválida');
+    }
+
+    repoPath = await mkdtempPromise(path.join(os.tmpdir(), 'cg-pr-'));
+    // execFile (sem shell) + argumentos separados: nada é interpretado pelo shell
+    await execFilePromise('git', ['clone', '--depth', '1', `${repoUrl}.git`, repoPath]);
+    await execFilePromise('git', ['-C', repoPath, 'fetch', 'origin', `pull/${pr}/head:pr-${pr}`]);
+    await execFilePromise('git', ['-C', repoPath, 'checkout', `pr-${pr}`]);
 
     const result = await scannerService.runCheckovAndSave(projectId, tenantId, repoPath);
+    await prisma.scan.update({ where: { id: scanId }, data: { engine: result.engine } });
 
     if (process.env.GITHUB_APP_ID && process.env.GITHUB_PRIVATE_KEY_PATH && installationId) {
         try {
@@ -98,10 +111,10 @@ async function processScanJob(data: any) {
             const octokit = await app.getInstallationOctokit(installationId);
             const [owner, repo] = repoFullName?.split('/') || [];
 
-            let comment = `## 🔍 CloudGuardian Security Scan\n\n✅ **${result.passed}** checks passed\n❌ **${result.failed}** violations found\n\n`;
+            let comment = `## 🔍 CloudGuardian Security Scan\n\n> Engine: \`${result.engine}\`\n\n✅ **${result.passed}** checks passed\n❌ **${result.failed}** violations found\n\n`;
             if (result.failed > 0) {
                 comment += `### 🔴 Violações Detectadas:\n`;
-                result.vulnerabilities.slice(0, 5).forEach((v: any) => {
+                result.vulnerabilities.slice(0, 5).forEach((v) => {
                 comment += `- **${v.title}** (${v.severity}): ${v.filePath || 'N/A'}\n`;
                 });
                 if (result.failed > 5) comment += `\n... e mais ${result.failed - 5} violações.`;
@@ -109,7 +122,7 @@ async function processScanJob(data: any) {
                 comment += `\n🎉 Nenhuma violação encontrada!`;
             }
             if (owner && repo) {
-                await octokit.rest.issues.createComment({ owner, repo, issue_number: prNumber, body: comment });
+                await octokit.rest.issues.createComment({ owner, repo, issue_number: pr, body: comment });
             }
         } catch(e) {
             console.error("Github comment failed", e);
@@ -120,13 +133,20 @@ async function processScanJob(data: any) {
       where: { id: scanId },
       data: {
         status: 'completed',
-        result: { prNumber, repoFullName, passed: result.passed, failed: result.failed, vulnerabilities: result.vulnerabilities }
+        finishedAt: new Date(),
+        vulnsCount: result.failed,
+        result: { engine: result.engine, prNumber: pr, repoFullName, passed: result.passed, failed: result.failed, vulnerabilities: result.vulnerabilities } as any,
       }
     });
-    console.log(`✅ Scan ${scanId} finalizado pelo worker.`);
-  } catch (error) {
+    console.log(`✅ Scan ${scanId} finalizado pelo worker (engine: ${result.engine}).`);
+  } catch (error: any) {
     console.error(`❌ Scan ${scanId} falhou no worker:`, error);
-    await prisma.scan.update({ where: { id: scanId }, data: { status: 'failed' } });
+    await prisma.scan.update({
+      where: { id: scanId },
+      data: { status: 'failed', finishedAt: new Date(), error: String(error?.message || error) },
+    }).catch(() => {});
+  } finally {
+    if (repoPath) await rmPromise(repoPath, { recursive: true, force: true }).catch(() => {});
   }
 }
 
@@ -139,15 +159,16 @@ async function processContentScanJob(data: { scanId: string; tenantId: string; c
       data: { status: 'running', startedAt: new Date() },
     });
 
-    const vulnerabilities = await scannerService.scanTerraform(content, tenantId);
+    const outcome = await scannerService.analyzeAndPersist(content, tenantId);
 
     await prisma.scan.update({
       where: { id: scanId },
       data: {
         status: 'completed',
+        engine: outcome.engine,
         finishedAt: new Date(),
-        vulnsCount: vulnerabilities.length,
-        result: { security_issues: vulnerabilities },
+        vulnsCount: outcome.vulnerabilities.length,
+        result: { engine: outcome.engine, security_issues: outcome.vulnerabilities } as any,
       },
     });
     console.log(`✅ Content scan ${scanId} finalizado pelo worker.`);

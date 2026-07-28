@@ -32,8 +32,16 @@
 ### Arquitetura (Fase 3)
 - [x] Multi-tenancy defensivo no schema (`tenantId` obrigatório + índices).
 - [x] Scans assíncronos com status persistido no modelo `Scan`.
-- [ ] Runner de Checkov em container Docker efêmero (hoje roda no host com fallback simulado).
+
+### Motor & Confiança (Fase 5) — ver `docs/PHASE5_ENGINE.md`
+- [x] Fim do fallback simulado enganoso; todo scan carrega o `engine` usado.
+- [x] Motor de regras nativo real (`services/nativeEngine.ts`), testado.
+- [x] Runner do Checkov em container isolado (sem rede, read-only, sem privilégios).
+- [x] Webhook do GitHub fail-closed com assinatura HMAC timing-safe.
+- [x] Clone de PR sem injeção de shell (execFile + validação de entrada).
 - [ ] Redis/BullMQ para fila distribuída (hoje a fila é em memória — perde jobs em restart).
+- [ ] Publicar o GitHub App e validar o fluxo de PR ponta a ponta.
+- [ ] Fixar a imagem do Checkov por digest em produção.
 
 ### Produto (Fase 4)
 - [x] Webhook Stripe com verificação de assinatura + persistência de `Tenant.plan`.
