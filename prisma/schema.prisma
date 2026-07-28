@@ -125,6 +125,7 @@ model Vulnerability {
 model CostAnalysis {
   id          String   @id @default(uuid())
   tenantId    String
+  source      String   @default("estimate") // aws-cost-explorer | estimate
   period      String
   startDate   DateTime
   endDate     DateTime
