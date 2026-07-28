@@ -6,6 +6,7 @@ import { promisify } from 'util';
 import { prisma } from './db';
 import { NotificationService } from './notificationService';
 import { scanTerraformNative, type NativeFinding } from './nativeEngine';
+import { buildCheckovDockerArgs, checkovImage } from './checkovDocker';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -120,54 +121,62 @@ export class ScannerService {
     const dir = await mkdtempAsync(path.join(os.tmpdir(), 'cg-scan-'));
     try {
       await writeFileAsync(path.join(dir, 'main.tf'), code);
-      const image = process.env.CHECKOV_IMAGE || 'bridgecrew/checkov:latest';
-      // Container efêmero, sem rede, read-only, sem privilégios: isola o código do cliente
-      const args = [
-        'run', '--rm',
-        '--network', 'none',
-        '--read-only',
-        '--security-opt', 'no-new-privileges',
-        '--memory', '512m', '--cpus', '1',
-        '-v', `${dir}:/tf:ro`,
-        image,
-        '-d', '/tf', '-o', 'json', '--compact',
-      ];
-      let stdout = '';
-      try {
-        const r = await execFileAsync('docker', args, {
-          timeout: 180_000,
-          maxBuffer: 20 * 1024 * 1024,
-        });
-        stdout = r.stdout;
-      } catch (e: any) {
-        if (e?.stdout) stdout = e.stdout;
-        else throw e;
-      }
-      return this.parseCheckov(stdout, 'checkov-docker');
+      return await this.runCheckovInDocker(dir);
     } finally {
       await rmAsync(dir, { recursive: true, force: true }).catch(() => {});
     }
   }
 
-  /** Escaneia um diretório clonado (fluxo do webhook de PR). */
+  /**
+   * Executa o Checkov em um container isolado sobre `hostDir` (montado :ro).
+   * Compartilhado pelos fluxos de snippet e de repositório. O chamador é dono
+   * do ciclo de vida de `hostDir` (criação/limpeza).
+   */
+  private async runCheckovInDocker(hostDir: string): Promise<ScanOutcome> {
+    const args = buildCheckovDockerArgs(hostDir, checkovImage());
+    let stdout = '';
+    try {
+      const r = await execFileAsync('docker', args, {
+        timeout: 300_000,
+        maxBuffer: 40 * 1024 * 1024,
+      });
+      stdout = r.stdout;
+    } catch (e: any) {
+      // Checkov sai com código != 0 quando encontra violações — isso não é erro
+      if (e?.stdout) stdout = e.stdout;
+      else throw e;
+    }
+    return this.parseCheckov(stdout, 'checkov-docker');
+  }
+
+  /**
+   * Escaneia um diretório clonado (fluxo do webhook de PR). Como o repositório
+   * é NÃO confiável, com SCAN_RUNNER=docker o Checkov roda numa sandbox
+   * isolada em vez de no host. Ordem: docker → checkov no host → engine nativo.
+   */
   async runCheckovAndSave(_projectId: string, tenantId: string, repoPath: string): Promise<ScanOutcome> {
+    const runner = (process.env.SCAN_RUNNER || 'auto').toLowerCase();
     let outcome: ScanOutcome;
     try {
-      let stdout = '';
-      try {
-        const r = await execFileAsync('checkov', ['-d', repoPath, '-o', 'json', '--compact', '--quiet'], {
-          timeout: 300_000,
-          maxBuffer: 40 * 1024 * 1024,
-        });
-        stdout = r.stdout;
-      } catch (e: any) {
-        if (e?.stdout) stdout = e.stdout;
-        else throw e;
+      if (runner === 'docker') {
+        outcome = await this.runCheckovInDocker(repoPath);
+      } else {
+        let stdout = '';
+        try {
+          const r = await execFileAsync('checkov', ['-d', repoPath, '-o', 'json', '--compact', '--quiet'], {
+            timeout: 300_000,
+            maxBuffer: 40 * 1024 * 1024,
+          });
+          stdout = r.stdout;
+        } catch (e: any) {
+          if (e?.stdout) stdout = e.stdout;
+          else throw e;
+        }
+        outcome = this.parseCheckov(stdout, 'checkov');
       }
-      outcome = this.parseCheckov(stdout, 'checkov');
     } catch (error) {
-      // Sem Checkov no ambiente: cai para o engine nativo lendo os .tf do diretório
-      console.warn('Checkov indisponível no runner; usando engine nativo.', error);
+      // Docker/Checkov indisponível: cai para o engine nativo lendo os .tf
+      console.warn('Runner Checkov indisponível; usando engine nativo.', error);
       const code = this.readTerraformFiles(repoPath);
       outcome = this.runNative(code);
     }

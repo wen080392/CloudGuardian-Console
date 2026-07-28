@@ -41,15 +41,30 @@ coberto por testes (`tests/nativeEngine.test.ts`).
 
 `docker/checkov-runner.Dockerfile` empacota o Checkov. Com `SCAN_RUNNER=docker`,
 a API executa o código do cliente num container efêmero **sem rede,
-read-only, sem novos privilégios, com limites de CPU/memória**:
+read-only, sem novos privilégios, sem capabilities, com limites de CPU/memória
+e de PIDs**:
 
 ```
 docker run --rm --network none --read-only \
-  --security-opt no-new-privileges --memory 512m --cpus 1 \
-  -v <tmpdir>:/tf:ro bridgecrew/checkov:latest -d /tf -o json --compact
+  --security-opt no-new-privileges --cap-drop ALL --pids-limit 512 \
+  --memory 512m --cpus 1 --tmpfs /tmp \
+  -v <dir>:/tf:ro <CHECKOV_IMAGE> -d /tf -o json --compact --quiet
 ```
 
-Isso resolve o risco de rodar IaC de terceiros no processo da própria API.
+Os argumentos são montados por `buildCheckovDockerArgs` (função pura, testada
+em `tests/checkovDocker.test.ts`) e compartilhados pelos **dois** fluxos:
+
+- **snippet** (Scanner da UI): `runCheckovDocker` grava o código num tempdir e o monta.
+- **repositório** (webhook de PR): `runCheckovAndSave` monta o repo clonado —
+  antes ele rodava o Checkov direto no host sobre um repositório **não
+  confiável**; agora, com `SCAN_RUNNER=docker`, roda na sandbox isolada.
+
+Symlinks dentro do repo apontando para fora de `/tf` são inertes: o filesystem
+do host não é montado no container, então directory traversal via symlink não
+resolve. Isso resolve o risco de rodar IaC de terceiros no host da API.
+
+**Produção:** fixe a imagem por digest (`CHECKOV_IMAGE=bridgecrew/checkov@sha256:…`)
+em vez de `:latest`, para builds reprodutíveis e imunes a um push malicioso na tag.
 
 ### 4. Webhook do GitHub fail-closed
 
