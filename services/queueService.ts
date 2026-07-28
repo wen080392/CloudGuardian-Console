@@ -14,24 +14,19 @@ const mkdtempPromise = util.promisify(fs.mkdtemp);
 const rmPromise = util.promisify(fs.rm);
 const reportService = new ReportService();
 
-// Fila em Memória
-// Em um ambiente de produção real, isso seria BullMQ + Redis.
-// Para este ambiente rodar de forma self-contained, usamos um processor em memória que simula a fila.
-type Job = {
-  type: string;
-  data: any;
-  id: string;
-  resolve?: () => void;
-  reject?: (e: unknown) => void;
-};
-const queue: Job[] = [];
-let processing = false;
+// A fila usa um driver plugável: in-memory por padrão, BullMQ/Redis quando
+// REDIS_URL está definido (ver services/queue/).
+import { getQueueDriver, type JobType } from './queue';
+
+const driver = getQueueDriver();
+driver.process(async (type: JobType, data: any) => {
+  if (type === 'scan') return processScanJob(data);
+  if (type === 'content-scan') return processContentScanJob(data);
+  if (type === 'report') return processReportJob(data);
+});
 
 export const addScanJob = (data: any) => {
-  const jobId = `job-${Date.now()}`;
-  queue.push({ type: 'scan', data, id: jobId });
-  console.log(`[Queue] Added scan job ${jobId}`);
-  processQueue();
+  driver.add('scan', data);
 };
 
 /**
@@ -40,43 +35,11 @@ export const addScanJob = (data: any) => {
  * permitindo que o endpoint aguarde com timeout e caia para polling.
  */
 export const addContentScanJob = (data: { scanId: string; tenantId: string; content: string }) => {
-  const jobId = `job-${Date.now()}`;
-  const done = new Promise<void>((resolve, reject) => {
-    queue.push({ type: 'content-scan', data, id: jobId, resolve, reject });
-  });
-  console.log(`[Queue] Added content-scan job ${jobId} (scan ${data.scanId})`);
-  processQueue();
-  return { jobId, done };
+  return driver.add('content-scan', data);
 };
 
 export const addReportJob = (data: any) => {
-  const jobId = `job-${Date.now()}`;
-  queue.push({ type: 'report', data, id: jobId });
-  console.log(`[Queue] Added report job ${jobId}`);
-  processQueue();
-};
-
-const processQueue = async () => {
-  if (processing || queue.length === 0) return;
-  processing = true;
-
-  while (queue.length > 0) {
-    const job = queue.shift();
-    if (!job) continue;
-
-    console.log(`[Queue] Processing ${job.type} job ${job.id}`);
-    try {
-      if (job.type === 'scan') await processScanJob(job.data);
-      if (job.type === 'content-scan') await processContentScanJob(job.data);
-      if (job.type === 'report') await processReportJob(job.data);
-      job.resolve?.();
-    } catch (e) {
-      console.error(`[Queue] Error processing job ${job.id}:`, e);
-      job.reject?.(e);
-    }
-  }
-
-  processing = false;
+  driver.add('report', data);
 };
 
 // Worker de Scan
