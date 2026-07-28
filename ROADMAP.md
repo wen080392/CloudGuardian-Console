@@ -54,7 +54,7 @@
 - [x] Teste de regressão da "tela preta" (resource/resourceId).
 - [x] E2E do funil PLG com Playwright + job de CI.
 - [x] Correção de 2º crash de boot: cliente Gemini agora é lazy (chave opcional).
-- [ ] Migrar o frontend do Tailwind CDN para Tailwind compilado (PostCSS/Vite).
+- [x] Frontend migrado do Tailwind CDN para Tailwind compilado (PostCSS/Vite).
 
 ### Produto (Fase 4)
 - [x] Webhook Stripe com verificação de assinatura + persistência de `Tenant.plan`.

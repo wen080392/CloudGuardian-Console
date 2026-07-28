@@ -43,9 +43,20 @@ em tela branca — antes até do ErrorBoundary. Corrigido com **inicialização
 lazy** (`getAI()`): o cliente só é construído quando há chave e sob demanda; sem
 chave, a IA degrada graciosamente ("IA indisponível") em vez de quebrar a app.
 
-## Pendência conhecida (produção)
+## 8.4 Tailwind compilado (fim da dependência de CDN)
 
-O frontend depende do **Tailwind Play CDN** (script em `index.html`) em runtime.
-Em ambientes com CSP restrita ou rede bloqueada, o CDN falha e a UI fica sem
-estilo (o app renderiza, mas cru). Migrar para Tailwind compilado via
-PostCSS/Vite é o próximo passo de robustez do frontend.
+O frontend dependia do **Tailwind Play CDN** (`<script src="cdn.tailwindcss.com">`)
+em runtime — em rede bloqueada/CSP restrita, o CDN falhava e a UI ficava sem
+estilo. Migrado para Tailwind compilado via PostCSS/Vite:
+
+- `tailwind.config.js` com a paleta e animações exatas do config inline (mais
+  `primary-700/900`, que o código usava mas o config do CDN não definia — eram
+  no-ops silenciosos; agora funcionam com a escala azul padrão).
+- `postcss.config.js` (tailwindcss + autoprefixer) e `index.css` com as
+  diretivas `@tailwind` + os estilos globais (`.glass`, `.neo-card`, scrollbar).
+- `index.html` sem CDN, config inline nem `<style>`; `index.tsx` importa o CSS.
+- O build agora emite um asset CSS (~71 KB, purgado) — antes não havia CSS
+  algum no bundle, pois o Tailwind era 100% runtime.
+
+Verificado no browser (app buildada, sem CDN): renderiza totalmente estilizada,
+sem o erro `tailwind is not defined`.
