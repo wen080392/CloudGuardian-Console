@@ -186,7 +186,12 @@ function App() {
   const handleApplyFix = async (vulnId: string, newSnippet: string) => {
     const targetVuln = vulnerabilities.find((v: Vulnerability) => v.id === vulnId);
     if (!targetVuln) return;
-    const resourceParts = targetVuln.resource.split('.');
+    // Guarda contra `resource` ausente/malformado — evita crash (tela preta)
+    const resourceParts = (targetVuln.resource || '').split('.');
+    if (resourceParts.length < 2) {
+      showNotification('Não foi possível localizar o recurso para aplicar o patch.', 'error');
+      return;
+    }
     const regex = new RegExp(`resource\\s+"${resourceParts[0]}"\\s+"${resourceParts[1]}"\\s*{[\\s\\S]*?}`, 'g');
     if (regex.test(terraformCode)) {
       setTerraformCode(terraformCode.replace(regex, newSnippet));

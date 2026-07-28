@@ -57,17 +57,27 @@ export const Scanner: React.FC<ScannerProps> = ({ code, onCodeChange, onScanComp
 
   const handleApplyFixWithPR = async (vulnId: string, fixCode: string) => {
     setRemediationStatus('initializing');
-    
-    setTimeout(() => setRemediationStatus('patching'), 1000);
-    setTimeout(() => setRemediationStatus('pushing'), 2500);
+    const t1 = setTimeout(() => setRemediationStatus('patching'), 1000);
+    const t2 = setTimeout(() => setRemediationStatus('pushing'), 2500);
 
-    const result = await API.createRemediationPR(vulnId, fixCode);
-    
-    setTimeout(() => {
+    try {
+      const result = await API.createRemediationPR(vulnId, fixCode);
+      clearTimeout(t1);
+      clearTimeout(t2);
       setPrData(result);
       setRemediationStatus('completed');
       onApplyFix(vulnId, fixCode); // Aplica localmente também
-    }, 4000);
+    } catch (e) {
+      // Ex.: GITHUB_TOKEN ausente / 503. Não deixa a HUD travar carregando:
+      // aplica o patch localmente e encerra graciosamente.
+      console.error('Falha ao criar o PR de remediação:', e);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      onApplyFix(vulnId, fixCode);
+      setRemediationStatus('completed');
+      setPrData(null);
+      setTimeout(() => setRemediationStatus('idle'), 3000);
+    }
   };
 
   const applyBlueprint = (newCode: string) => {

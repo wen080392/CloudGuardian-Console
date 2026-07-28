@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../services/db';
 import { remediationService } from '../services/remediationService';
 import { validate } from '../middleware/validate';
+import { toApiVulnerability } from '../services/vulnerabilityMapper';
 
 const remediateSchema = z.object({
   body: z.object({
@@ -31,7 +32,7 @@ router.get('/', async (req: Request, res: Response): Promise<any> => {
       orderBy: { createdAt: 'desc' }
     });
 
-    res.json(vulnerabilities);
+    res.json(vulnerabilities.map(toApiVulnerability));
   } catch (error) {
     console.error('Erro ao buscar vulnerabilidades:', error);
     res.status(500).json({ error: 'Erro ao buscar vulnerabilidades' });
@@ -53,7 +54,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<any> => {
       return res.status(404).json({ error: 'Vulnerabilidade não encontrada' });
     }
 
-    res.json(vuln);
+    res.json(toApiVulnerability(vuln));
   } catch (error) {
     console.error('Erro ao buscar vulnerabilidade:', error);
     res.status(500).json({ error: 'Erro ao buscar vulnerabilidade' });

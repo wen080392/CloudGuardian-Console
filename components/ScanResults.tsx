@@ -110,7 +110,7 @@ export const ScanResults: React.FC<ScanResultsProps> = ({ findings, codeContext,
                 ) : (
                   <div className="space-y-3 animate-in fade-in">
                     <DiffViewer 
-                      original={codeContext.split('\n').filter(l => l.includes(f.resource.split('.')[1])).join('\n') || '/* Código Original */'} 
+                      original={codeContext.split('\n').filter(l => l.includes((f.resource || '').split('.')[1] || '')).join('\n') || '/* Código Original */'}
                       fixed={aiFix[f.id]} 
                     />
                     <button onClick={() => handleFixAndCommit(f)} disabled={committing === f.id} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black rounded-xl flex items-center justify-center gap-2 uppercase tracking-widest shadow-lg shadow-emerald-900/30 transition-all active:scale-95">

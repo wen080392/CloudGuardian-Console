@@ -161,10 +161,12 @@ class CloudGuardianBackend {
       return { ...event, id: `evt-${Date.now()}`, timestamp: new Date().toISOString() };
     }
   }
-  async getVulnerabilities() { 
+  async getVulnerabilities() {
     try {
       const response = await apiClient.get('/api/v1/vulnerabilities');
-      return response.data;
+      const list = Array.isArray(response.data) ? response.data : [];
+      // Retrocompat: o banco usa `resourceId`; a UI espera `resource`.
+      return list.map((v: any) => ({ ...v, resource: v.resource ?? v.resourceId ?? '' }));
     } catch (e) { return []; }
   }
   async setVulnerabilities(vulns: any[]) {
