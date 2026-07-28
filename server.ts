@@ -8,6 +8,7 @@ import * as dotenv from "dotenv";
 import { addContentScanJob } from './services/queueService';
 import { prisma } from './services/db';
 import authRouter from './routes/auth';
+import instantAuditRouter from './routes/instantAudit';
 import stripeRouter from './routes/stripe';
 import assetsRouter from './routes/assets';
 import vulnerabilitiesRouter from './routes/vulnerabilities';
@@ -77,6 +78,8 @@ async function startServer() {
   // API Routes (Public)
   app.use('/api/v1/auth', authRouter);
   app.use('/api/v1/stripe', stripeRouter);
+  // Auditoria de 5 minutos (PLG) — pública, com rate limit próprio
+  app.use('/api/v1/audit', instantAuditRouter);
 
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", service: "CloudGuardian API", version: "1.0.0" });

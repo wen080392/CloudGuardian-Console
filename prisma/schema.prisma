@@ -257,6 +257,34 @@ model CloudCredential {
   @@unique([tenantId, provider])
 }
 
+// Funil PLG: lead que rodou a "auditoria de 5 minutos" sem conta
+model Lead {
+  id        String        @id @default(uuid())
+  email     String
+  company   String?
+  source    String        @default("instant-audit")
+  createdAt DateTime      @default(now())
+  audits    InstantAudit[]
+
+  @@index([email])
+}
+
+model InstantAudit {
+  id            String   @id @default(uuid())
+  leadId        String
+  lead          Lead     @relation(fields: [leadId], references: [id])
+  score         Int
+  engine        String   // native | checkov
+  totalFindings Int      @default(0)
+  summary       Json     // contagem por severidade
+  findings      Json     // lista resumida
+  downloadToken String   @unique
+  convertedTenantId String? // preenchido se o lead virar cliente
+  createdAt     DateTime @default(now())
+
+  @@index([leadId])
+}
+
 model Drift {
   id           String   @id @default(uuid())
   tenantId     String

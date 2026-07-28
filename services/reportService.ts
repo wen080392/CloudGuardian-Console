@@ -35,8 +35,16 @@ export class ReportService {
       include: { policy: true }
     });
 
-    // 5. Buscar análise de custos mais recente (mocked since missing cost analysis model)
-    const costAnalysis = { totalCost: 12000, savings: 350 };
+    // 5. Buscar a análise de custos real mais recente do tenant (0 se não houver)
+    const latestCost = await prisma.costAnalysis.findFirst({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' },
+    });
+    const costAnalysis = {
+      totalCost: latestCost?.totalCost ?? 0,
+      savings: latestCost?.savings ?? 0,
+      source: latestCost?.source ?? 'none',
+    };
 
     // 6. Compilar métricas
     const totalVulns = vulnerabilities.length;

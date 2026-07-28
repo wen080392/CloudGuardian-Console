@@ -52,8 +52,12 @@
 - [x] Webhook Stripe com verificação de assinatura + persistência de `Tenant.plan`.
 - [x] Enforcement de limites por plano (projetos por tier).
 - [x] Esqueleto de auto-remediação (PR automático de fix via Octokit).
-- [ ] Auditoria de 5 minutos (PLG): conectar repo → PDF executivo, polido ponta a ponta.
-- [ ] Testes E2E (Playwright/Cypress) do fluxo Login → Scan → Fix.
+
+### PLG — Auditoria de 5 Minutos (Fase 7) — ver `docs/PHASE7_PLG.md`
+- [x] Endpoint público `POST /api/v1/audit/instant` (motor nativo + score + captura de lead).
+- [x] Relatório executivo em PDF por token; `reportService` sem custo mockado.
+- [ ] Seção "Auditoria grátis" na LandingPage + nurturing por email do lead.
+- [ ] Testes E2E (Playwright/Cypress) do funil e do fluxo Login → Scan → Fix.
 
 ## ⚠️ Pendências de deploy
 - Rodar migração do Prisma (novos campos: `Tenant.plan`, `BudgetAlert.createdAt`;
