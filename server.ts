@@ -5,7 +5,7 @@ import path from "path";
 import fs from "fs";
 import * as Sentry from "@sentry/node";
 import * as dotenv from "dotenv";
-import { scannerService } from './services/scannerService';
+import { addContentScanJob } from './services/queueService';
 import { prisma } from './services/db';
 import authRouter from './routes/auth';
 import stripeRouter from './routes/stripe';
@@ -136,19 +136,61 @@ async function startServer() {
         return res.status(403).json({ error: 'Tenant context is missing.' });
       }
 
-      // Use the new ScannerService to run Checkov (or simulate)
-      const vulnerabilities = await scannerService.scanTerraform(content, tenantId);
-      
+      // Persiste o scan como pending e processa via fila (serializa execuções
+      // do Checkov em vez de rodar N scans em paralelo no processo da API)
+      const scan = await prisma.scan.create({
+        data: { tenantId, status: 'pending', fullCode: content },
+      });
+      const { done } = addContentScanJob({ scanId: scan.id, tenantId, content });
+
+      // Modo síncrono compatível com a UI: aguarda até 45s pela conclusão
+      const SYNC_TIMEOUT_MS = 45_000;
+      const finished = await Promise.race([
+        done.then(() => true).catch(() => true),
+        new Promise<false>(resolve => setTimeout(() => resolve(false), SYNC_TIMEOUT_MS)),
+      ]);
+
+      const current = await prisma.scan.findUnique({ where: { id: scan.id } });
+      if (!finished || !current || current.status === 'pending' || current.status === 'running') {
+        // Ainda processando — cliente consulta GET /api/v1/scans/:id
+        return res.status(202).json({ id: scan.id, status: current?.status ?? 'pending' });
+      }
+      if (current.status === 'failed') {
+        return res.status(500).json({ id: current.id, status: 'failed', detail: current.error });
+      }
       res.json({
-        id: Date.now(),
-        status: "completed",
-        output_data: {
-          security_issues: vulnerabilities
-        }
+        id: current.id,
+        status: current.status,
+        output_data: current.result ?? { security_issues: [] },
       });
     } catch (error) {
       console.error("Scan failed:", error);
       res.status(500).json({ detail: "Internal Server Error during scan execution." });
+    }
+  });
+
+  // Status de um scan (para o modo assíncrono/polling)
+  app.get("/api/v1/scans/:id", async (req, res): Promise<any> => {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) return res.status(403).json({ error: 'Tenant context is missing.' });
+    const id = String(req.params.id);
+    try {
+      const scan = await prisma.scan.findFirst({
+        where: { id, OR: [{ tenantId }, { project: { tenantId } }] },
+      });
+      if (!scan) return res.status(404).json({ error: 'Scan não encontrado' });
+      res.json({
+        id: scan.id,
+        status: scan.status,
+        vulnsCount: scan.vulnsCount,
+        startedAt: scan.startedAt,
+        finishedAt: scan.finishedAt,
+        error: scan.error,
+        output_data: scan.status === 'completed' ? scan.result : undefined,
+      });
+    } catch (error) {
+      console.error('Failed to fetch scan:', error);
+      res.status(500).json({ error: 'Failed to fetch scan' });
     }
   });
 
@@ -157,7 +199,7 @@ async function startServer() {
     if (!tenantId) return res.status(403).json({ error: 'Tenant context is missing.' });
     try {
       const scans = await prisma.scan.findMany({
-        where: { project: { tenantId } },
+        where: { OR: [{ tenantId }, { project: { tenantId } }] },
         orderBy: { createdAt: 'desc' },
         take: 20,
         include: { project: { select: { name: true, score: true } } },
@@ -165,10 +207,10 @@ async function startServer() {
       res.json(scans.map(s => ({
         id: s.id,
         timestamp: s.createdAt.toISOString(),
-        score: s.project.score,
+        score: s.project?.score ?? null,
         vulnsCount: s.vulnsCount,
         status: s.status,
-        projectName: s.project.name,
+        projectName: s.project?.name ?? 'Scan ad-hoc',
       })));
     } catch (error) {
       console.error('Failed to fetch scan history:', error);

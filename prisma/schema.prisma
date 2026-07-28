@@ -64,12 +64,14 @@ model Project {
 
 model Scan {
   id          String   @id @default(uuid())
-  projectId   String
-  project     Project  @relation(fields: [projectId], references: [id])
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id])
+  // tenantId direto permite scans ad-hoc (sem projeto) isolados por tenant
+  tenantId    String?
   vulnsCount  Int      @default(0)
   code        String?
   fullCode    String?
-  status      String   @default("completed")
+  status      String   @default("pending")
   result      Json?
   error       String?
   startedAt   DateTime?
@@ -77,6 +79,7 @@ model Scan {
   createdAt   DateTime @default(now())
 
   @@index([projectId, createdAt])
+  @@index([tenantId, createdAt])
 }
 
 model Asset {

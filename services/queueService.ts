@@ -13,7 +13,13 @@ const reportService = new ReportService();
 // Fila em Memória
 // Em um ambiente de produção real, isso seria BullMQ + Redis.
 // Para este ambiente rodar de forma self-contained, usamos um processor em memória que simula a fila.
-type Job = { type: string; data: any; id: string };
+type Job = {
+  type: string;
+  data: any;
+  id: string;
+  resolve?: () => void;
+  reject?: (e: unknown) => void;
+};
 const queue: Job[] = [];
 let processing = false;
 
@@ -22,6 +28,21 @@ export const addScanJob = (data: any) => {
   queue.push({ type: 'scan', data, id: jobId });
   console.log(`[Queue] Added scan job ${jobId}`);
   processQueue();
+};
+
+/**
+ * Enfileira um scan de conteúdo Terraform (ad-hoc, vindo da UI).
+ * Retorna uma promise resolvida quando o worker terminar o job,
+ * permitindo que o endpoint aguarde com timeout e caia para polling.
+ */
+export const addContentScanJob = (data: { scanId: string; tenantId: string; content: string }) => {
+  const jobId = `job-${Date.now()}`;
+  const done = new Promise<void>((resolve, reject) => {
+    queue.push({ type: 'content-scan', data, id: jobId, resolve, reject });
+  });
+  console.log(`[Queue] Added content-scan job ${jobId} (scan ${data.scanId})`);
+  processQueue();
+  return { jobId, done };
 };
 
 export const addReportJob = (data: any) => {
@@ -42,9 +63,12 @@ const processQueue = async () => {
     console.log(`[Queue] Processing ${job.type} job ${job.id}`);
     try {
       if (job.type === 'scan') await processScanJob(job.data);
+      if (job.type === 'content-scan') await processContentScanJob(job.data);
       if (job.type === 'report') await processReportJob(job.data);
+      job.resolve?.();
     } catch (e) {
       console.error(`[Queue] Error processing job ${job.id}:`, e);
+      job.reject?.(e);
     }
   }
 
@@ -103,6 +127,41 @@ async function processScanJob(data: any) {
   } catch (error) {
     console.error(`❌ Scan ${scanId} falhou no worker:`, error);
     await prisma.scan.update({ where: { id: scanId }, data: { status: 'failed' } });
+  }
+}
+
+// Worker de scan de conteúdo Terraform (ad-hoc, sem clone de repositório)
+async function processContentScanJob(data: { scanId: string; tenantId: string; content: string }) {
+  const { scanId, tenantId, content } = data;
+  try {
+    await prisma.scan.update({
+      where: { id: scanId },
+      data: { status: 'running', startedAt: new Date() },
+    });
+
+    const vulnerabilities = await scannerService.scanTerraform(content, tenantId);
+
+    await prisma.scan.update({
+      where: { id: scanId },
+      data: {
+        status: 'completed',
+        finishedAt: new Date(),
+        vulnsCount: vulnerabilities.length,
+        result: { security_issues: vulnerabilities },
+      },
+    });
+    console.log(`✅ Content scan ${scanId} finalizado pelo worker.`);
+  } catch (error: any) {
+    console.error(`❌ Content scan ${scanId} falhou no worker:`, error);
+    await prisma.scan.update({
+      where: { id: scanId },
+      data: {
+        status: 'failed',
+        finishedAt: new Date(),
+        error: String(error?.message || error),
+      },
+    }).catch(() => {});
+    throw error;
   }
 }
 
