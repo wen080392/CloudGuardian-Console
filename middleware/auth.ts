@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { adminAuth } from '../services/firebaseAdmin';
-import { prisma } from '../services/db';
+import { provisionUser } from '../services/userProvisioningService';
 
 declare global {
   namespace Express {
@@ -23,70 +23,21 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
 
   const token = authHeader.split(' ')[1];
 
+  let decoded;
   try {
-    let decodedUid = '';
-    
-    // 1. Verificar token do Firebase
-    try {
-      const decoded = await adminAuth.verifyIdToken(token);
-      decodedUid = decoded.uid;
-    } catch (firebaseError) {
-      console.warn("Firebase token verification failed:", firebaseError);
-      return res.status(401).json({ error: 'Token inválido ou expirado' });
-    }
+    decoded = await adminAuth.verifyIdToken(token);
+  } catch (firebaseError) {
+    console.warn('Firebase token verification failed:', firebaseError);
+    return res.status(401).json({ error: 'Token inválido ou expirado' });
+  }
 
-    // 2. Buscar usuário no banco de dados (PostgreSQL) pelo UID
-    let user = await prisma.user.findUnique({
-      where: { firebaseUid: decodedUid },
-      include: { tenant: true }
+  try {
+    const user = await provisionUser({
+      firebaseUid: decoded.uid,
+      email: decoded.email || 'user@example.com',
+      name: decoded.name,
     });
 
-    // 3. Se não existir, auto-criar
-    if (!user) {
-      try {
-        const decoded = await adminAuth.verifyIdToken(token);
-        const email = decoded.email || 'user@example.com';
-        const name = decoded.name || 'Auto-created User';
-        
-        let existingUserByEmail = await prisma.user.findUnique({
-          where: { email: email }
-        });
-        if (existingUserByEmail) {
-          user = await prisma.user.update({
-            where: { email: email },
-            data: { firebaseUid: decodedUid },
-            include: { tenant: true }
-          });
-        } else {
-          const tenant = await prisma.tenant.create({
-            data: {
-              name: `${email.split('@')[0]}'s Company`,
-              users: {
-                create: {
-                  firebaseUid: decodedUid,
-                  email: email,
-                  name: name,
-                  role: 'admin'
-                }
-              }
-            }
-          });
-          user = await prisma.user.findUnique({
-            where: { firebaseUid: decodedUid },
-            include: { tenant: true }
-          });
-        }
-        
-        if (!user) {
-           return res.status(404).json({ error: 'Usuário não encontrado no banco de dados' });
-        }
-      } catch (e) {
-         console.error('Failed to auto-create user', e);
-         return res.status(404).json({ error: 'Usuário não encontrado no banco de dados e falha ao auto-criar' });
-      }
-    }
-
-    // 4. Anexar os dados do usuário e tenant na requisição
     req.user = {
       userId: user.id,
       tenantId: user.tenantId,
@@ -96,7 +47,7 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
 
     next();
   } catch (error) {
-    console.error('Erro de autenticação:', error);
-    return res.status(401).json({ error: 'Erro de autenticação' });
+    console.error('Erro ao provisionar usuário:', error);
+    return res.status(500).json({ error: 'Erro ao carregar contexto do usuário' });
   }
 };
