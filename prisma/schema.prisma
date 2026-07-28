@@ -33,11 +33,13 @@ model User {
   email       String   @unique
   name        String?
   role        String   @default("viewer")
-  tenantId    String?
-  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   projects    Project[]
+
+  @@index([tenantId])
 }
 
 model Project {
@@ -49,13 +51,15 @@ model Project {
   score        Int      @default(100)
   repoUrl      String?
   githubRepoId String?
-  tenantId     String?
-  tenant       Tenant?  @relation(fields: [tenantId], references: [id])
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   userId       String
   user         User     @relation(fields: [userId], references: [id])
   scans        Scan[]
+
+  @@index([tenantId])
 }
 
 model Scan {
@@ -67,7 +71,12 @@ model Scan {
   fullCode    String?
   status      String   @default("completed")
   result      Json?
+  error       String?
+  startedAt   DateTime?
+  finishedAt  DateTime?
   createdAt   DateTime @default(now())
+
+  @@index([projectId, createdAt])
 }
 
 model Asset {
@@ -84,6 +93,8 @@ model Asset {
   tenantId   String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  @@index([tenantId])
 }
 
 model Vulnerability {
@@ -97,11 +108,14 @@ model Vulnerability {
   status      String   
   filePath    String?  
   line        Int?     
-  details     Json?    
+  details     Json?
   tenantId    String
-  
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([tenantId, severity, status])
+  @@index([tenantId, createdAt])
 }
 
 model CostAnalysis {
@@ -119,6 +133,8 @@ model CostAnalysis {
   tags        Json
   recommendations Json
   createdAt   DateTime @default(now())
+
+  @@index([tenantId])
 }
 
 model BudgetAlert {
@@ -137,6 +153,8 @@ model BudgetAlert {
   currentSpend Float   @default(0)
   lastChecked DateTime?
   createdAt   DateTime @default(now())
+
+  @@index([tenantId])
 }
 
 model Policy {
@@ -160,6 +178,8 @@ model Policy {
   updatedAt      DateTime @updatedAt
 
   evaluations    PolicyEvaluation[]
+
+  @@index([tenantId])
 }
 
 model PolicyEvaluation {
@@ -171,6 +191,9 @@ model PolicyEvaluation {
   details     Json?
   evaluatedAt DateTime @default(now())
   tenantId    String
+
+  @@index([tenantId])
+  @@index([policyId])
 }
 
 model ComplianceReport {
@@ -191,9 +214,11 @@ model ComplianceReport {
   
   status      String   // draft, completed, published, archived
   pdfUrl      String?
-  
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
 }
 
 model NotificationSetting {
@@ -238,6 +263,8 @@ model AuditLog {
   details     Json?
   ipAddress   String?
   userAgent   String?
-  
+
   createdAt   DateTime @default(now())
+
+  @@index([tenantId, createdAt])
 }
