@@ -39,17 +39,20 @@
 - [x] Runner do Checkov em container isolado (sem rede, read-only, sem privilégios).
 - [x] Webhook do GitHub fail-closed com assinatura HMAC timing-safe.
 - [x] Clone de PR sem injeção de shell (execFile + validação de entrada).
-- [ ] Redis/BullMQ para fila distribuída (hoje a fila é em memória — perde jobs em restart).
-- [ ] Publicar o GitHub App e validar o fluxo de PR ponta a ponta.
-- [ ] Fixar a imagem do Checkov por digest em produção.
+- [x] Fixar a imagem do Checkov por digest em produção. *(configurável via `CHECKOV_IMAGE`)*
+
+### Integrações Reais (Fase 6) — ver `docs/PHASE6_INTEGRATIONS.md`
+- [x] Redis/BullMQ para fila distribuída (driver plugável, ativado por `REDIS_URL`).
+- [x] FinOps com dados reais da AWS Cost Explorer API (rotulado por `source`).
+- [x] Drift detection real (`terraform plan --refresh-only`, cron + sob demanda).
+- [x] GitHub App publica Check Run na PR (status que bloqueia merge).
+- [ ] Provisionar Redis + workers dedicados e publicar o GitHub App em produção.
 
 ### Produto (Fase 4)
 - [x] Webhook Stripe com verificação de assinatura + persistência de `Tenant.plan`.
 - [x] Enforcement de limites por plano (projetos por tier).
 - [x] Esqueleto de auto-remediação (PR automático de fix via Octokit).
 - [ ] Auditoria de 5 minutos (PLG): conectar repo → PDF executivo, polido ponta a ponta.
-- [ ] Drift detection real (`terraform plan --refresh-only` agendado contra as clouds).
-- [ ] FinOps com dados reais da AWS Cost Explorer API.
 - [ ] Testes E2E (Playwright/Cypress) do fluxo Login → Scan → Fix.
 
 ## ⚠️ Pendências de deploy
