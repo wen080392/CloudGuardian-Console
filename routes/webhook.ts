@@ -75,6 +75,7 @@ router.post('/github', express.raw({ type: 'application/json' }), async (req: Re
         tenantId: project.tenantId,
         repoFullName,
         prNumber,
+        headSha: pull_request.head?.sha,
         installationId: payload.installation?.id || Number(process.env.GITHUB_INSTALLATION_ID) || 0,
         repoUrl: repository.html_url,
       });

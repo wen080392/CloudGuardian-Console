@@ -5,9 +5,9 @@ import os from 'os';
 import path from 'path';
 import util from 'util';
 import { execFile } from 'child_process';
-import { App } from 'octokit';
 import { ReportService } from './reportService';
 import { uploadPDF } from './storageService';
+import { githubAppService, buildCheckRunPayload } from './githubAppService';
 
 const execFilePromise = util.promisify(execFile);
 const mkdtempPromise = util.promisify(fs.mkdtemp);
@@ -44,7 +44,7 @@ export const addReportJob = (data: any) => {
 
 // Worker de Scan
 async function processScanJob(data: any) {
-  const { scanId, projectId, tenantId, repoFullName, prNumber, installationId, repoUrl } = data;
+  const { scanId, projectId, tenantId, repoFullName, prNumber, headSha, installationId, repoUrl } = data;
   let repoPath = '';
   try {
     await prisma.scan.update({ where: { id: scanId }, data: { status: 'running', startedAt: new Date() } });
@@ -65,31 +65,27 @@ async function processScanJob(data: any) {
     const result = await scannerService.runCheckovAndSave(projectId, tenantId, repoPath);
     await prisma.scan.update({ where: { id: scanId }, data: { engine: result.engine } });
 
-    if (process.env.GITHUB_APP_ID && process.env.GITHUB_PRIVATE_KEY_PATH && installationId) {
-        try {
-            const app = new App({
-                appId: process.env.GITHUB_APP_ID,
-                privateKey: fs.readFileSync(process.env.GITHUB_PRIVATE_KEY_PATH, 'utf8'),
-            });
-            const octokit = await app.getInstallationOctokit(installationId);
-            const [owner, repo] = repoFullName?.split('/') || [];
-
-            let comment = `## 🔍 CloudGuardian Security Scan\n\n> Engine: \`${result.engine}\`\n\n✅ **${result.passed}** checks passed\n❌ **${result.failed}** violations found\n\n`;
-            if (result.failed > 0) {
-                comment += `### 🔴 Violações Detectadas:\n`;
-                result.vulnerabilities.slice(0, 5).forEach((v) => {
-                comment += `- **${v.title}** (${v.severity}): ${v.filePath || 'N/A'}\n`;
-                });
-                if (result.failed > 5) comment += `\n... e mais ${result.failed - 5} violações.`;
-            } else {
-                comment += `\n🎉 Nenhuma violação encontrada!`;
-            }
-            if (owner && repo) {
-                await octokit.rest.issues.createComment({ owner, repo, issue_number: pr, body: comment });
-            }
-        } catch(e) {
-            console.error("Github comment failed", e);
+    // Publica um Check Run (status que pode bloquear o merge) quando o
+    // GitHub App está configurado e temos o SHA do head da PR
+    if (githubAppService.isConfigured() && installationId && headSha) {
+      try {
+        const [owner, repo] = repoFullName?.split('/') || [];
+        if (owner && repo) {
+          const payload = buildCheckRunPayload({
+            headSha,
+            engine: result.engine,
+            passed: result.passed,
+            failed: result.failed,
+            vulnerabilities: result.vulnerabilities.map(v => ({
+              title: v.title, severity: v.severity, filePath: v.filePath,
+              line: v.line, description: v.description, ruleId: v.ruleId,
+            })),
+          });
+          await githubAppService.postCheckRun({ installationId, owner, repo, payload });
         }
+      } catch (e) {
+        console.error('GitHub Check Run failed', e);
+      }
     }
 
     await prisma.scan.update({
