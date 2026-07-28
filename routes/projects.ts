@@ -21,26 +21,11 @@ router.get('/', async (req: Request, res: Response): Promise<any> => {
   if (!tenantId || !userId) return res.status(403).json({ error: 'Tenant context is missing.' });
 
   try {
-    let projects = await prisma.project.findMany({
+    const projects = await prisma.project.findMany({
       where: { tenantId },
       orderBy: { createdAt: 'desc' },
       include: { scans: { take: 1, orderBy: { createdAt: 'desc' } } }
     });
-
-    // If no projects exist, create default ones for the user
-    if (projects.length === 0) {
-      await prisma.project.createMany({
-        data: [
-          { name: 'Infrastructure-Prod', cloud: 'AWS', region: 'us-east-1', status: 'active', score: 85, userId, tenantId },
-          { name: 'Legacy-Backend', cloud: 'Azure', region: 'eastus', status: 'active', score: 42, userId, tenantId }
-        ]
-      });
-      projects = await prisma.project.findMany({
-        where: { tenantId },
-        orderBy: { createdAt: 'desc' },
-        include: { scans: { take: 1, orderBy: { createdAt: 'desc' } } }
-      });
-    }
 
     // Map to frontend format
     const mapped = projects.map(p => ({

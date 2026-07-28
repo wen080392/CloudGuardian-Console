@@ -152,17 +152,51 @@ async function startServer() {
     }
   });
 
-  app.get("/api/v1/scans/history", (req, res) => {
-    res.json([
-      { id: 1, timestamp: new Date().toISOString(), score: 85, status: 'completed' },
-      { id: 2, timestamp: new Date(Date.now() - 86400000).toISOString(), score: 78, status: 'completed' }
-    ]);
+  app.get("/api/v1/scans/history", async (req, res): Promise<any> => {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) return res.status(403).json({ error: 'Tenant context is missing.' });
+    try {
+      const scans = await prisma.scan.findMany({
+        where: { project: { tenantId } },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        include: { project: { select: { name: true, score: true } } },
+      });
+      res.json(scans.map(s => ({
+        id: s.id,
+        timestamp: s.createdAt.toISOString(),
+        score: s.project.score,
+        vulnsCount: s.vulnsCount,
+        status: s.status,
+        projectName: s.project.name,
+      })));
+    } catch (error) {
+      console.error('Failed to fetch scan history:', error);
+      res.status(500).json({ error: 'Failed to fetch scan history' });
+    }
   });
 
-  app.get("/api/v1/guardrails", (req, res) => {
-    res.json([
-      { id: 'gr-1', name: 'S3 Public Block', description: 'Impedir buckets públicos.', resourceType: 'aws_s3_bucket', logic: 'acl != "public-read"', severity: 'CRITICAL', status: 'enabled' }
-    ]);
+  app.get("/api/v1/guardrails", async (req, res): Promise<any> => {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) return res.status(403).json({ error: 'Tenant context is missing.' });
+    try {
+      const policies = await prisma.policy.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' },
+      });
+      res.json(policies.map(p => ({
+        id: p.id,
+        name: p.name,
+        description: p.description || '',
+        resourceType: p.type,
+        logic: p.regoCode,
+        severity: p.severity.toUpperCase(),
+        status: p.enabled ? 'enabled' : 'disabled',
+      })));
+    } catch (error) {
+      console.error('Failed to fetch guardrails:', error);
+      res.status(500).json({ error: 'Failed to fetch guardrails' });
+    }
   });
 
   // 404 handler for unmatched API routes (static/SPA fallback handles the rest)
