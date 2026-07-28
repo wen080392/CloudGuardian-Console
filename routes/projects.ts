@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../services/db';
+import { canCreateProject } from '../services/planService';
 import { z } from 'zod';
 import { validate } from '../middleware/validate';
 
@@ -55,6 +56,9 @@ router.post('/', validate(createProjectSchema), async (req: Request, res: Respon
   const { name, cloud, region, repoUrl } = req.body;
 
   try {
+    const { allowed, reason } = await canCreateProject(tenantId);
+    if (!allowed) return res.status(402).json({ error: reason });
+
     const project = await prisma.project.create({
       data: { name, cloud, region: region || 'us-east-1', userId, tenantId, repoUrl }
     });
