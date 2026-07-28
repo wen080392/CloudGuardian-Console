@@ -48,6 +48,14 @@
 - [x] GitHub App publica Check Run na PR (status que bloqueia merge).
 - [ ] Provisionar Redis + workers dedicados e publicar o GitHub App em produção.
 
+### Fila, E2E e regressões (Fase 8) — ver `docs/PHASE8_QUEUE_E2E.md`
+- [x] Driver BullMQ endurecido (conexão ioredis correta, shutdown gracioso, observabilidade).
+- [x] Runner do Checkov isolado também no fluxo de repositório (webhook de PR).
+- [x] Teste de regressão da "tela preta" (resource/resourceId).
+- [x] E2E do funil PLG com Playwright + job de CI.
+- [x] Correção de 2º crash de boot: cliente Gemini agora é lazy (chave opcional).
+- [ ] Migrar o frontend do Tailwind CDN para Tailwind compilado (PostCSS/Vite).
+
 ### Produto (Fase 4)
 - [x] Webhook Stripe com verificação de assinatura + persistência de `Tenant.plan`.
 - [x] Enforcement de limites por plano (projetos por tier).

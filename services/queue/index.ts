@@ -23,6 +23,11 @@ export function getQueueDriver(): QueueDriver {
   return driver;
 }
 
+/** Encerra o driver ativo de forma graciosa (shutdown). */
+export async function closeQueueDriver(): Promise<void> {
+  await driver?.close?.();
+}
+
 /** Reseta o singleton — usado apenas em testes. */
 export function __resetQueueDriver(): void {
   driver = null;

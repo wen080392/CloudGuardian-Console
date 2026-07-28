@@ -2,6 +2,7 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { configDefaults } from 'vitest/config';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -9,6 +10,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    // e2e/ roda no Playwright, não no vitest (evita casar o glob *.spec.ts)
+    exclude: [...configDefaults.exclude, 'e2e/**'],
   },
   server: {
     port: 3000,

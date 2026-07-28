@@ -258,9 +258,24 @@ async function startServer() {
   app.get('*all', (req, res) => {
     res.sendFile(path.join(distPath, 'index.html'));
   });
-  app.listen(PORT, "0.0.0.0", () => {
+  const httpServer = app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
+
+  // Shutdown gracioso: fecha o HTTP e drena a fila (Redis) antes de sair
+  const shutdown = async (signal: string) => {
+    console.log(`\n${signal} recebido — encerrando graciosamente…`);
+    httpServer.close();
+    try {
+      const { closeQueueDriver } = await import('./services/queue');
+      await closeQueueDriver();
+    } catch (e) {
+      console.error('Erro no shutdown da fila:', e);
+    }
+    process.exit(0);
+  };
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  process.on('SIGINT', () => void shutdown('SIGINT'));
 }
 
 startServer();

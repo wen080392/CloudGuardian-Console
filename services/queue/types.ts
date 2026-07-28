@@ -16,4 +16,6 @@ export interface QueueDriver {
   process(processor: JobProcessor): void;
   /** Enfileira um job. */
   add(type: JobType, data: any): EnqueueResult;
+  /** Encerra recursos de forma graciosa (opcional; drivers sem estado externo podem omitir). */
+  close?(): Promise<void>;
 }
