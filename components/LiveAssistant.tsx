@@ -68,7 +68,7 @@ export const LiveAssistant: React.FC<LiveAssistantProps> = ({ onClose, codeConte
               scriptProcessor.connect(inputAudioContext.destination);
             },
             onmessage: async (message: LiveServerMessage) => {
-              const audioData = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
+              const audioData = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
               if (audioData) {
                 setIsSpeaking(true);
                 nextStartTimeRef.current = Math.max(nextStartTimeRef.current, outputAudioContext.currentTime);

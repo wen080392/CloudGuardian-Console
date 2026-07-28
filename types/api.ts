@@ -1,6 +1,7 @@
 
 export interface User {
-  id: number;
+  // Firebase UIDs are strings
+  id: string;
   email: string;
   full_name: string | null;
   company: string | null;

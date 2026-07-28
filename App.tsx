@@ -127,7 +127,7 @@ function App() {
 
   useEffect(() => {
     if (isAuthenticated && window.location.pathname === '/success') {
-      toast.success('Assinatura atualizada com sucesso!');
+      setToast({ message: 'Assinatura atualizada com sucesso!', type: 'success' });
       window.history.replaceState({}, '', '/');
     }
   }, [isAuthenticated]);
@@ -184,13 +184,13 @@ function App() {
   };
 
   const handleApplyFix = async (vulnId: string, newSnippet: string) => {
-    const targetVuln = vulnerabilities.find(v => v.id === vulnId);
+    const targetVuln = vulnerabilities.find((v: Vulnerability) => v.id === vulnId);
     if (!targetVuln) return;
     const resourceParts = targetVuln.resource.split('.');
     const regex = new RegExp(`resource\\s+"${resourceParts[0]}"\\s+"${resourceParts[1]}"\\s*{[\\s\\S]*?}`, 'g');
     if (regex.test(terraformCode)) {
       setTerraformCode(terraformCode.replace(regex, newSnippet));
-      const updatedVulns = vulnerabilities.filter(v => v.id !== vulnId);
+      const updatedVulns = vulnerabilities.filter((v: Vulnerability) => v.id !== vulnId);
       queryClient.setQueryData(['vulnerabilities'], updatedVulns);
       await API.setVulnerabilities(updatedVulns);
       showNotification("Patch aplicado com sucesso via IA.");
@@ -350,9 +350,9 @@ function App() {
           {currentView === 'graph' && <Graph code={terraformCode} vulnerabilities={vulnerabilities} />}
           {currentView === 'compliance' && <Compliance vulnerabilities={vulnerabilities} />}
           {currentView === 'drift' && <Drift isAuditorMode={isAuditorMode} />}
-          {currentView === 'policies' && <PolicyManager policies={policies} setPolicies={setPolicies} onNotify={showNotification} onTimeline={(evt) => setTimelineEvents(prev => [evt, ...prev])} />}
+          {currentView === 'policies' && <PolicyManager policies={policies} setPolicies={setPolicies} onNotify={showNotification} onTimeline={(evt) => setTimelineEvents((prev: TimelineEvent[]) => [evt, ...prev])} />}
           {currentView === 'policy-forge' && <PolicyForge onNotify={showNotification} />}
-          {currentView === 'cicd' && <PipelineInsights runs={pipelineRuns} setRuns={setPipelineRuns} onNotify={showNotification} onTimeline={(evt) => setTimelineEvents(prev => [evt, ...prev])} />}
+          {currentView === 'cicd' && <PipelineInsights runs={pipelineRuns} setRuns={setPipelineRuns} onNotify={showNotification} onTimeline={(evt) => setTimelineEvents((prev: TimelineEvent[]) => [evt, ...prev])} />}
           {currentView === 'finops' && <FinOps vulnerabilities={vulnerabilities} />}
           {currentView === 'automation' && <AutomationHub />}
           {currentView === 'sales-playbook' && <SalesPlaybook />}

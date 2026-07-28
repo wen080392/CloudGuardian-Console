@@ -1,7 +1,9 @@
 import express from "express";
-import helmet, { rateLimit } from "./middleware/mock_security";
+import helmet from "helmet";
+import { rateLimit } from "express-rate-limit";
 import path from "path";
-import Sentry from "./middleware/mock_sentry";
+import fs from "fs";
+import * as Sentry from "@sentry/node";
 import * as dotenv from "dotenv";
 import { scannerService } from './services/scannerService';
 import { prisma } from './services/db';
@@ -27,24 +29,18 @@ import './services/schedulerService';
 
 dotenv.config();
 
-// Start background worker for schedules scans
-scannerService.startWorker();
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? 0.1),
+    environment: process.env.NODE_ENV || 'development',
+  });
+}
 
 async function startServer() {
   const app = express();
 
-  // Initialize Sentry
-  Sentry.init({
-    dsn: process.env.SENTRY_DSN || "",
-    tracesSampleRate: 1.0,
-  });
-
-  // The request handler must be the first middleware on the app
-  app.use(Sentry.Handlers.requestHandler());
-  // TracingHandler creates a trace for every incoming request
-  app.use(Sentry.Handlers.tracingHandler());
-
-  const PORT = process.env.PORT || 3000;
+  const PORT = Number(process.env.PORT) || 3000;
   app.get("/ping", (req, res) => res.send("pong"));
 
   // Webhook needs raw body
@@ -68,9 +64,10 @@ async function startServer() {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
-  // Request Logger
+  // Request Logger — never log request bodies: they may contain
+  // cloud credentials, tokens or IaC source code
   app.use((req, res, next) => {
-    console.log(`${req.method} ${req.path}`, req.body);
+    console.log(`${req.method} ${req.path}`);
     next();
   });
 
@@ -106,24 +103,31 @@ async function startServer() {
   app.use('/api/v1/projects', projectsRouter);
   app.use('/api/v1/organization', organizationRouter);
 
-  // Serve locally stored report PDFs
+  // Serve locally stored report PDFs (auth required — mounted under /api/v1)
   app.get('/api/v1/reports/download/:filename', (req, res) => {
-    const filename = req.params.filename;
-    const filePath = path.join(process.cwd(), 'uploads', 'reports', filename);
-    if (require('fs').existsSync(filePath)) {
-      res.setHeader('Content-Type', 'application/pdf');
-      res.sendFile(filePath);
-    } else {
-      res.status(404).json({ error: 'File not found' });
+    // basename() strips any directory component, blocking path traversal
+    const filename = path.basename(req.params.filename);
+    if (!/^[\w.-]+\.pdf$/i.test(filename)) {
+      return res.status(400).json({ error: 'Invalid filename' });
     }
+    const reportsDir = path.join(process.cwd(), 'uploads', 'reports');
+    const filePath = path.resolve(reportsDir, filename);
+    if (!filePath.startsWith(reportsDir + path.sep) || !fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+    res.setHeader('Content-Type', 'application/pdf');
+    res.sendFile(filePath);
   });
 
   // Real Scans Endpoint
   app.post("/api/v1/scans", async (req, res) => {
-    const { content, scan_type } = req.body;
-    
-    if (!content) {
+    const { content } = req.body ?? {};
+
+    if (typeof content !== 'string' || content.trim().length === 0) {
       return res.status(400).json({ detail: "Content is required for scanning." });
+    }
+    if (content.length > 1_000_000) {
+      return res.status(413).json({ detail: "Content too large (max 1MB)." });
     }
 
     try {
@@ -161,13 +165,13 @@ async function startServer() {
     ]);
   });
 
-  // 404 handler
-  app.use('*', (req, res) => {
+  // 404 handler for unmatched API routes (static/SPA fallback handles the rest)
+  app.use('/api', (req, res) => {
     res.status(404).json({ error: 'Not found' });
   });
 
   // The error handler must be before any other error middleware and after all controllers
-  app.use(Sentry.Handlers.errorHandler());
+  Sentry.setupExpressErrorHandler(app);
 
   // Vite middleware removed to bypass NPM hang
   const distPath = path.join(process.cwd(), 'dist');

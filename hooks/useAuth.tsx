@@ -64,7 +64,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: email,
         full_name: email.split('@')[0],
         company: "Company",
-        role: "admin"
+        role: "admin",
+        is_active: true
       };
 
       localStorage.setItem('access_token', token);
@@ -91,9 +92,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userData: User = {
         id: userCredential.user.uid,
         email: userCredential.user.email || '',
-        full_name: userCredential.user.displayName || userCredential.user.email?.split('@')[0],
+        full_name: userCredential.user.displayName || userCredential.user.email?.split('@')[0] || null,
         company: "Company",
-        role: "admin"
+        role: "admin",
+        is_active: true
       };
 
       try {

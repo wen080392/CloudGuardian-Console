@@ -1,28 +1,13 @@
-// MOCKED PRISMA TO BYPASS NPM HANG
-export const pool = { query: async () => ({ rows: [] }) };
+import 'dotenv/config';
+import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 
-const createMockDelegate = () => ({
-  findMany: async () => [],
-  findUnique: async () => null,
-  findFirst: async () => null,
-  create: async (args: any) => ({ id: 'mock-' + Date.now(), ...args.data }),
-  update: async (args: any) => ({ id: 'mock-' + Date.now(), ...args.data }),
-  updateMany: async () => ({ count: 1 }),
-  delete: async () => ({}),
-  deleteMany: async () => ({ count: 1 }),
-  upsert: async (args: any) => ({ id: 'mock-' + Date.now(), ...args.create })
-});
+if (!process.env.DATABASE_URL) {
+  throw new Error(
+    'DATABASE_URL não configurada. O backend requer PostgreSQL — veja .env.example.'
+  );
+}
 
-export const prisma = {
-  vulnerability: createMockDelegate(),
-  auditLog: createMockDelegate(),
-  project: createMockDelegate(),
-  user: createMockDelegate(),
-  tenant: createMockDelegate(),
-  complianceReport: createMockDelegate(),
-  cloudCredential: createMockDelegate(),
-  costAnalysis: createMockDelegate(),
-  budgetAlert: createMockDelegate(),
-  asset: createMockDelegate(),
-  scanResult: createMockDelegate()
-};
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+
+export const prisma = new PrismaClient({ adapter });

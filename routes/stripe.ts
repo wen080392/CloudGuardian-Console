@@ -18,7 +18,7 @@ router.post('/create-checkout-session', async (req, res) => {
     }
     
     if (process.env.STRIPE_SECRET_KEY) {
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-11-20.acacia' });
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2026-06-24.dahlia' });
       
       // Mapeamento dos Planos (Growth, Business, Enterprise)
       let productName = 'Plano Customizado';
@@ -74,7 +74,7 @@ router.post('/webhook', async (req, res) => {
   const sig = req.headers['stripe-signature'];
   let event;
   
-  const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-11-20.acacia' }) : null;
+  const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2026-06-24.dahlia' }) : null;
   const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   if (stripe && endpointSecret) {

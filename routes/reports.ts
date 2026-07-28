@@ -68,7 +68,7 @@ router.post('/', async (req: Request, res: Response): Promise<any> => {
 router.get('/:id/download', async (req: Request, res: Response): Promise<any> => {
   const tenantId = req.user?.tenantId;
   if (!tenantId) return res.status(403).json({ error: 'Tenant context missing' });
-  const { id } = req.params;
+  const id = String(req.params.id);
   try {
     const report = await prisma.complianceReport.findFirst({
         where: { id, tenantId }

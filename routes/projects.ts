@@ -18,7 +18,7 @@ const router = Router();
 router.get('/', async (req: Request, res: Response): Promise<any> => {
   const tenantId = req.user?.tenantId;
   const userId = req.user?.userId;
-  if (!tenantId) return res.status(403).json({ error: 'Tenant context is missing.' });
+  if (!tenantId || !userId) return res.status(403).json({ error: 'Tenant context is missing.' });
 
   try {
     let projects = await prisma.project.findMany({
@@ -65,7 +65,7 @@ router.get('/', async (req: Request, res: Response): Promise<any> => {
 router.post('/', validate(createProjectSchema), async (req: Request, res: Response): Promise<any> => {
   const tenantId = req.user?.tenantId;
   const userId = req.user?.userId;
-  if (!tenantId) return res.status(403).json({ error: 'Tenant context is missing.' });
+  if (!tenantId || !userId) return res.status(403).json({ error: 'Tenant context is missing.' });
 
   const { name, cloud, region, repoUrl } = req.body;
 
@@ -84,7 +84,7 @@ router.post('/', validate(createProjectSchema), async (req: Request, res: Respon
 router.patch('/:id', async (req: Request, res: Response): Promise<any> => {
   const tenantId = req.user?.tenantId;
   if (!tenantId) return res.status(403).json({ error: 'Tenant context is missing.' });
-  const { id } = req.params;
+  const id = String(req.params.id);
   const { name, cloud, region, status, repoUrl } = req.body;
 
   try {

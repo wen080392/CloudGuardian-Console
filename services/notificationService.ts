@@ -1,8 +1,6 @@
 import { prisma } from './db';
-const axios = { post: async (...args: any[]) => console.log("Mock Axios POST:", args) };
-const nodemailer = {
-  createTransport: () => ({ sendMail: async (...args: any[]) => console.log("Mock nodemailer sendMail:", args) })
-};
+import axios from 'axios';
+import nodemailer from 'nodemailer';
 
 export class NotificationService {
   private transporter: nodemailer.Transporter | null = null;

@@ -31,7 +31,7 @@ router.get('/', async (req: Request, res: Response): Promise<any> => {
 router.get('/:id', async (req: Request, res: Response): Promise<any> => {
   const tenantId = req.user?.tenantId;
   if (!tenantId) return res.status(403).json({ error: 'Tenant context is missing.' });
-  const { id } = req.params;
+  const id = String(req.params.id);
 
   try {
     const vuln = await prisma.vulnerability.findFirst({
@@ -82,7 +82,7 @@ router.post('/', async (req: Request, res: Response): Promise<any> => {
 router.patch('/:id', async (req: Request, res: Response): Promise<any> => {
   const tenantId = req.user?.tenantId;
   if (!tenantId) return res.status(403).json({ error: 'Tenant context is missing.' });
-  const { id } = req.params;
+  const id = String(req.params.id);
   const { status } = req.body;
 
   try {
