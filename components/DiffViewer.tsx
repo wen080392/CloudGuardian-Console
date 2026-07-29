@@ -12,7 +12,9 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({ original, fixed }) => {
   const fixedLines = fixed.split('\n');
 
   return (
-    <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden font-mono text-[10px] shadow-inner">
+    // translate="no": o diff de código não deve ser traduzido pelo navegador —
+    // a tradução mangla os nós de texto e quebra a reconciliação do React
+    <div translate="no" className="notranslate bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden font-mono text-[10px] shadow-inner">
       <div className="bg-slate-900/50 px-4 py-2 border-b border-slate-800 flex justify-between items-center">
         <span className="text-slate-500 uppercase font-black tracking-widest">IA Proposed Review</span>
         <div className="flex items-center gap-2">

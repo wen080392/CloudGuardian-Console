@@ -1,9 +1,15 @@
 
 <!DOCTYPE html>
-<html lang="en">
+<!-- translate="no" + notranslate: extensões de tradução do navegador (ex.:
+     Google Translate) reescrevem nós de texto e quebram a reconciliação do
+     React ("Failed to execute 'insertBefore'...") ao re-renderizar áreas
+     densas de texto, como o editor de Terraform. lang=pt-BR reduz a oferta
+     automática de tradução (o conteúdo é majoritariamente português). -->
+<html lang="pt-BR" translate="no">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="google" content="notranslate" />
     <title>CloudGuardian Console</title>
     <script>
       // Polyfill para evitar "process is not defined" no navegador
