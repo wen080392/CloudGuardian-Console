@@ -1,9 +1,9 @@
 
-import React from 'react';
-import { 
-  Shield, GitPullRequest, Clock, FileCheck, ArrowRight, Zap, 
-  Lock, AlertCircle, CheckCircle2, Globe, Users, TrendingUp, 
-  ChevronRight, Award, BarChart3, Rocket 
+import React, { useState } from 'react';
+import {
+  Shield, GitPullRequest, Clock, FileCheck, ArrowRight, Zap,
+  Lock, AlertCircle, CheckCircle2, Globe, Users, TrendingUp,
+  ChevronRight, Award, BarChart3, Rocket, Loader2, Download, ScanLine
 } from 'lucide-react';
 
 interface LandingPageProps {
@@ -31,6 +31,7 @@ export const LandingPage: React.FC<LandingPageProps & { onPricing?: () => void }
           <div className="hidden md:flex items-center gap-8 text-sm font-bold text-slate-400">
             <button onClick={() => scrollToSection('solucao')} className="hover:text-white transition-colors">Solução</button>
             <button onClick={() => scrollToSection('como-funciona')} className="hover:text-white transition-colors">Como Funciona</button>
+            <button onClick={() => scrollToSection('auditoria')} className="hover:text-white transition-colors">Auditoria Grátis</button>
             <button onClick={() => scrollToSection('precos')} className="hover:text-white transition-colors">Preços</button>
           </div>
           <div className="flex items-center gap-4">
@@ -73,11 +74,12 @@ export const LandingPage: React.FC<LandingPageProps & { onPricing?: () => void }
               Começar grátis por 14 dias
               <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
             </button>
-            <button 
-              onClick={onViewDemo}
+            <button
+              onClick={() => scrollToSection('auditoria')}
               className="w-full sm:w-auto px-8 py-4 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl border border-slate-800 transition-all flex items-center justify-center gap-2 text-lg"
             >
-              Ver demo ao vivo
+              <ScanLine size={20} className="text-primary-400" />
+              Auditoria grátis em 5 min
             </button>
           </div>
 
@@ -187,6 +189,9 @@ export const LandingPage: React.FC<LandingPageProps & { onPricing?: () => void }
         </div>
       </section>
 
+      {/* Instant Audit (PLG) */}
+      <InstantAuditSection />
+
       {/* Compliance Section */}
       <section className="py-24 px-6">
         <div className="max-w-6xl mx-auto bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-[32px] p-8 md:p-16 flex flex-col lg:flex-row gap-12 items-center">
@@ -291,6 +296,206 @@ export const LandingPage: React.FC<LandingPageProps & { onPricing?: () => void }
         <p className="text-slate-600 text-xs">© 2025 CloudGuardian Inc. Todos os direitos reservados. Made for security builders.</p>
       </footer>
     </div>
+  );
+};
+
+interface AuditFinding {
+  ruleId: string;
+  title: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  resource: string;
+  remediation: string;
+}
+interface AuditResult {
+  score: number;
+  engine: string;
+  summary: { critical: number; high: number; medium: number; low: number; total: number };
+  topFindings: AuditFinding[];
+  reportUrl: string;
+}
+
+const SAMPLE_TF = `resource "aws_s3_bucket" "assets" {
+  bucket = "my-company-assets"
+  acl    = "public-read"
+}
+
+resource "aws_security_group" "web" {
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_db_instance" "main" {
+  engine              = "postgres"
+  publicly_accessible = true
+}`;
+
+const SEV_STYLE: Record<string, { text: string; bg: string; ring: string; label: string }> = {
+  critical: { text: 'text-red-400', bg: 'bg-red-500/10 border-red-500/20', ring: 'stroke-red-500', label: 'Crítico' },
+  high: { text: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20', ring: 'stroke-orange-500', label: 'Alto' },
+  medium: { text: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20', ring: 'stroke-amber-500', label: 'Médio' },
+  low: { text: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20', ring: 'stroke-blue-500', label: 'Baixo' },
+};
+
+const scoreColor = (score: number) =>
+  score >= 80 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444';
+
+const InstantAuditSection = () => {
+  const [email, setEmail] = useState('');
+  const [company, setCompany] = useState('');
+  const [terraform, setTerraform] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<AuditResult | null>(null);
+
+  const runAudit = async () => {
+    setError(null);
+    setResult(null);
+    if (!email || !terraform.trim()) {
+      setError('Informe seu email e cole o código Terraform.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const resp = await fetch('/api/v1/audit/instant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, company: company || undefined, terraform }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        setError(data?.error || 'Falha ao executar a auditoria.');
+      } else {
+        setResult(data);
+      }
+    } catch {
+      setError('Não foi possível conectar ao servidor.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <section id="auditoria" className="py-24 px-6 bg-slate-900/20 border-y border-slate-900">
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center space-y-4 mb-12">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary-500/10 border border-primary-500/20 rounded-full text-primary-400 text-[10px] font-black uppercase tracking-widest">
+            <ScanLine size={12} />
+            Auditoria de 5 minutos
+          </div>
+          <h2 className="text-4xl font-black text-white tracking-tight">Cole seu Terraform. Veja seus riscos agora.</h2>
+          <p className="text-slate-400 text-lg max-w-2xl mx-auto">
+            Sem instalar nada, sem cartão de crédito. Rodamos nosso motor de análise no seu código e geramos um relatório executivo em PDF.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+          {/* Input */}
+          <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input
+                type="email" value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="seu@email.com"
+                className="px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-600 focus:border-primary-500 focus:outline-none"
+              />
+              <input
+                type="text" value={company} onChange={e => setCompany(e.target.value)}
+                placeholder="Empresa (opcional)"
+                className="px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-600 focus:border-primary-500 focus:outline-none"
+              />
+            </div>
+            <div className="relative">
+              <textarea
+                value={terraform} onChange={e => setTerraform(e.target.value)}
+                placeholder="Cole aqui seu código Terraform (.tf)…"
+                rows={12}
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono text-slate-300 placeholder-slate-600 focus:border-primary-500 focus:outline-none resize-none"
+              />
+              <button
+                onClick={() => setTerraform(SAMPLE_TF)}
+                className="absolute top-2 right-2 text-[10px] font-bold text-slate-500 hover:text-primary-400 bg-slate-950/80 px-2 py-1 rounded uppercase tracking-wider"
+              >
+                Usar exemplo
+              </button>
+            </div>
+            <button
+              onClick={runAudit} disabled={loading}
+              className="w-full py-4 bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white font-bold rounded-xl transition-all shadow-xl shadow-primary-900/40 flex items-center justify-center gap-2"
+            >
+              {loading ? <><Loader2 size={20} className="animate-spin" /> Analisando…</> : <><ScanLine size={20} /> Rodar auditoria grátis</>}
+            </button>
+            {error && <p className="text-sm text-red-400 flex items-center gap-2"><AlertCircle size={16} /> {error}</p>}
+            <p className="text-[10px] text-slate-600 text-center">Analisamos apenas o código enviado. Nada é executado.</p>
+          </div>
+
+          {/* Result */}
+          <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 min-h-[360px] flex items-center justify-center">
+            {!result ? (
+              <div className="text-center text-slate-600 space-y-3">
+                <Shield size={48} className="mx-auto opacity-30" />
+                <p className="text-sm">Seu relatório de riscos aparece aqui.</p>
+              </div>
+            ) : (
+              <div className="w-full space-y-6">
+                <div className="flex items-center gap-6">
+                  <ScoreRing score={result.score} />
+                  <div className="flex-1 grid grid-cols-2 gap-2">
+                    {(['critical', 'high', 'medium', 'low'] as const).map(sev => (
+                      <div key={sev} className={`px-3 py-2 rounded-xl border ${SEV_STYLE[sev].bg}`}>
+                        <div className={`text-lg font-black ${SEV_STYLE[sev].text}`}>{result.summary[sev]}</div>
+                        <div className="text-[9px] uppercase font-bold text-slate-500 tracking-wider">{SEV_STYLE[sev].label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {result.topFindings.length === 0 ? (
+                    <p className="text-sm text-emerald-400 flex items-center gap-2"><CheckCircle2 size={16} /> Nenhum risco detectado no código enviado.</p>
+                  ) : result.topFindings.map((f, i) => (
+                    <div key={i} className={`p-3 rounded-xl border ${SEV_STYLE[f.severity].bg}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-slate-200">{f.title}</span>
+                        <span className={`text-[9px] font-black uppercase ${SEV_STYLE[f.severity].text}`}>{f.ruleId}</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 font-mono mt-1">{f.resource}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <a
+                  href={result.reportUrl} target="_blank" rel="noopener noreferrer"
+                  className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-sm"
+                >
+                  <Download size={18} /> Baixar relatório executivo (PDF)
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const ScoreRing = ({ score }: { score: number }) => {
+  const r = 40;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (score / 100) * circ;
+  return (
+    <svg width="110" height="110" viewBox="0 0 110 110" className="shrink-0">
+      <circle cx="55" cy="55" r={r} fill="none" stroke="#1e293b" strokeWidth="10" />
+      <circle
+        cx="55" cy="55" r={r} fill="none" stroke={scoreColor(score)} strokeWidth="10"
+        strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+        transform="rotate(-90 55 55)"
+      />
+      <text x="55" y="52" textAnchor="middle" fontSize="26" fontWeight="bold" fill="white">{score}</text>
+      <text x="55" y="70" textAnchor="middle" fontSize="9" fill="#64748b" className="uppercase font-bold">Score</text>
+    </svg>
   );
 };
 

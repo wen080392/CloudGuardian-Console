@@ -1,4 +1,5 @@
 import { prisma } from './db';
+import { costExplorerService, type CostSource } from './costExplorerService';
 
 // Preços de referência (exemplo – em produção use a API de pricing da AWS)
 const pricing: Record<string, any> = {
@@ -133,8 +134,21 @@ export class FinOpsService {
       where: { tenantId },
     });
 
+    // Fonte de custo: dados reais da AWS quando configurado, senão estimativa
+    let source: CostSource = 'estimate';
+    let realCost: Awaited<ReturnType<typeof costExplorerService.getMonthToDateCost>> | null = null;
+    if (costExplorerService.isConfigured()) {
+      try {
+        realCost = await costExplorerService.getMonthToDateCost();
+        source = realCost.source;
+      } catch (e) {
+        console.warn('Cost Explorer indisponível; usando estimativa por rulepack de preços.', e);
+      }
+    }
+
     const analysis: any = {
       tenantId,
+      source,
       totalCost: 0,
       projectedCost: 0,
       savings: 0,
@@ -179,8 +193,20 @@ export class FinOpsService {
       }
     }
 
-    analysis.projectedCost = analysis.totalCost * 12;
     analysis.efficiency = analysis.resources.length > 0 ? analysis.resources.reduce((sum: number, r: any) => sum + r.efficiency, 0) / analysis.resources.length : 100;
+
+    // Custo real da AWS sobrepõe a estimativa quando disponível
+    if (realCost) {
+      analysis.totalCost = realCost.totalCost;
+      analysis.projectedCost = realCost.projectedCost;
+      analysis.currency = realCost.currency;
+      // Mescla o custo real por serviço da AWS
+      for (const s of realCost.byService) {
+        analysis.services[s.service] = { ...(analysis.services[s.service] || { count: 0, savings: 0 }), cost: s.cost };
+      }
+    } else {
+      analysis.projectedCost = analysis.totalCost * 12;
+    }
 
     // Ordenar recomendações por savings
     analysis.recommendations.sort((a: any, b: any) => b.savings - a.savings);
@@ -189,6 +215,7 @@ export class FinOpsService {
     const costAnalysis = await prisma.costAnalysis.create({
       data: {
         tenantId,
+        source,
         period: 'monthly',
         startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
         endDate: new Date(),

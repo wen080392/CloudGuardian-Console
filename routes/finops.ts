@@ -27,6 +27,7 @@ router.get('/dashboard', async (req: Request, res: Response): Promise<any> => {
     const topRecommendations = latestRecs.slice(0, 5);
 
     res.json({
+      source: latest?.source || 'estimate',
       currentCost: latest?.totalCost || 0,
       projectedCost: latest?.projectedCost || 0,
       savings: latest?.savings || 0,

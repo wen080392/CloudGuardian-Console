@@ -1,11 +1,23 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { prisma } from '../services/db';
 import { encryptionService } from '../services/encryptionService';
 import { audit } from '../services/auditService';
+import { validate } from '../middleware/validate';
+
+const saveCredentialSchema = z.object({
+  body: z.object({
+    provider: z.enum(['aws', 'gcp', 'azure', 'github']),
+    roleArn: z.string().max(2048).optional().nullable(),
+    accessKey: z.string().min(1).max(4096).optional().nullable(),
+    secretKey: z.string().min(1).max(4096).optional().nullable(),
+    region: z.string().max(64).optional().nullable(),
+  }),
+});
 
 const router = Router();
 
-router.post('/', async (req, res): Promise<any> => {
+router.post('/', validate(saveCredentialSchema), async (req, res): Promise<any> => {
   const tenantId = req.user?.tenantId;
   const userId = req.user?.userId;
   if (!tenantId) return res.status(403).json({ error: 'Contexto de tenant necessário' });

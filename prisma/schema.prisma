@@ -15,6 +15,7 @@ datasource db {
 model Tenant {
   id        String    @id @default(uuid())
   name      String
+  plan      String    @default("starter")
   users     User[]
   projects         Project[]
   policies         Policy[]
@@ -32,11 +33,13 @@ model User {
   email       String   @unique
   name        String?
   role        String   @default("viewer")
-  tenantId    String?
-  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   projects    Project[]
+
+  @@index([tenantId])
 }
 
 model Project {
@@ -48,25 +51,36 @@ model Project {
   score        Int      @default(100)
   repoUrl      String?
   githubRepoId String?
-  tenantId     String?
-  tenant       Tenant?  @relation(fields: [tenantId], references: [id])
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   userId       String
   user         User     @relation(fields: [userId], references: [id])
   scans        Scan[]
+
+  @@index([tenantId])
 }
 
 model Scan {
   id          String   @id @default(uuid())
-  projectId   String
-  project     Project  @relation(fields: [projectId], references: [id])
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id])
+  // tenantId direto permite scans ad-hoc (sem projeto) isolados por tenant
+  tenantId    String?
   vulnsCount  Int      @default(0)
   code        String?
   fullCode    String?
-  status      String   @default("completed")
+  status      String   @default("pending")
+  engine      String?  // checkov | checkov-docker | native
   result      Json?
+  error       String?
+  startedAt   DateTime?
+  finishedAt  DateTime?
   createdAt   DateTime @default(now())
+
+  @@index([projectId, createdAt])
+  @@index([tenantId, createdAt])
 }
 
 model Asset {
@@ -83,6 +97,8 @@ model Asset {
   tenantId   String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  @@index([tenantId])
 }
 
 model Vulnerability {
@@ -96,16 +112,20 @@ model Vulnerability {
   status      String   
   filePath    String?  
   line        Int?     
-  details     Json?    
+  details     Json?
   tenantId    String
-  
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([tenantId, severity, status])
+  @@index([tenantId, createdAt])
 }
 
 model CostAnalysis {
   id          String   @id @default(uuid())
   tenantId    String
+  source      String   @default("estimate") // aws-cost-explorer | estimate
   period      String
   startDate   DateTime
   endDate     DateTime
@@ -118,6 +138,8 @@ model CostAnalysis {
   tags        Json
   recommendations Json
   createdAt   DateTime @default(now())
+
+  @@index([tenantId])
 }
 
 model BudgetAlert {
@@ -135,6 +157,9 @@ model BudgetAlert {
   triggeredAt DateTime?
   currentSpend Float   @default(0)
   lastChecked DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
 }
 
 model Policy {
@@ -158,6 +183,8 @@ model Policy {
   updatedAt      DateTime @updatedAt
 
   evaluations    PolicyEvaluation[]
+
+  @@index([tenantId])
 }
 
 model PolicyEvaluation {
@@ -169,6 +196,9 @@ model PolicyEvaluation {
   details     Json?
   evaluatedAt DateTime @default(now())
   tenantId    String
+
+  @@index([tenantId])
+  @@index([policyId])
 }
 
 model ComplianceReport {
@@ -189,9 +219,11 @@ model ComplianceReport {
   
   status      String   // draft, completed, published, archived
   pdfUrl      String?
-  
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
 }
 
 model NotificationSetting {
@@ -225,6 +257,53 @@ model CloudCredential {
   @@unique([tenantId, provider])
 }
 
+// Funil PLG: lead que rodou a "auditoria de 5 minutos" sem conta
+model Lead {
+  id        String        @id @default(uuid())
+  email     String
+  company   String?
+  source    String        @default("instant-audit")
+  createdAt DateTime      @default(now())
+  audits    InstantAudit[]
+
+  @@index([email])
+}
+
+model InstantAudit {
+  id            String   @id @default(uuid())
+  leadId        String
+  lead          Lead     @relation(fields: [leadId], references: [id])
+  score         Int
+  engine        String   // native | checkov
+  totalFindings Int      @default(0)
+  summary       Json     // contagem por severidade
+  findings      Json     // lista resumida
+  downloadToken String   @unique
+  convertedTenantId String? // preenchido se o lead virar cliente
+  createdAt     DateTime @default(now())
+
+  @@index([leadId])
+}
+
+model Drift {
+  id           String   @id @default(uuid())
+  tenantId     String
+  projectId    String?
+  resource     String   // endereço do recurso (ex.: aws_s3_bucket.assets)
+  driftType    String   // update | delete | create
+  provider     String?  // aws | gcp | azure
+  severity     String   @default("medium")
+  status       String   @default("detected") // detected | resolved | ignored
+  expected     Json?    // estado desejado (do IaC)
+  actual       Json?    // estado real (da cloud)
+  source       String   @default("terraform-refresh") // terraform-refresh | derived
+  detectedAt   DateTime @default(now())
+  resolvedAt   DateTime?
+
+  @@index([tenantId, status])
+  @@index([projectId])
+}
+
 model AuditLog {
   id          String   @id @default(uuid())
   tenantId    String
@@ -236,6 +315,8 @@ model AuditLog {
   details     Json?
   ipAddress   String?
   userAgent   String?
-  
+
   createdAt   DateTime @default(now())
+
+  @@index([tenantId, createdAt])
 }

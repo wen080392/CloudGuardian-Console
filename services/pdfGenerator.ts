@@ -28,7 +28,7 @@ export class PDFGenerator {
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
     });
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.setContent(html, { waitUntil: 'networkidle0' as any });
     const pdf = await page.pdf({ format: 'A4', printBackground: true });
     await browser.close();
 

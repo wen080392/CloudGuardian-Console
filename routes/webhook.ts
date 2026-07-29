@@ -1,43 +1,33 @@
 import express, { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { prisma } from '../services/db';
-import { App } from 'octokit';
-import { scannerService } from '../services/scannerService';
-import fs from 'fs';
-import { exec } from 'child_process';
-import util from 'util';
 
-const execPromise = util.promisify(exec);
 const router = Router();
 
-// Configurações do GitHub App (pegue do .env)
-const GITHUB_APP_ID = process.env.GITHUB_APP_ID || '123456';
-const GITHUB_PRIVATE_KEY_PATH = process.env.GITHUB_PRIVATE_KEY_PATH || './github-private-key.pem';
-let GITHUB_PRIVATE_KEY = '';
-try {
-  if (fs.existsSync(GITHUB_PRIVATE_KEY_PATH)) {
-    GITHUB_PRIVATE_KEY = fs.readFileSync(GITHUB_PRIVATE_KEY_PATH, 'utf8');
-  }
-} catch (e) {
-  console.warn("Failed to load GitHub private key");
-}
-const GITHUB_WEBHOOK_SECRET = process.env.GITHUB_WEBHOOK_SECRET || 'secret';
+/**
+ * Verifica a assinatura HMAC-SHA256 do webhook do GitHub de forma
+ * timing-safe. Fail-closed: sem segredo configurado ou assinatura
+ * ausente/divergente, retorna false (a requisição é rejeitada).
+ */
+export function verifyGithubSignature(rawBody: Buffer, signature?: string): boolean {
+  const secret = process.env.GITHUB_WEBHOOK_SECRET;
+  if (!secret || !signature) return false;
 
-// Middleware de verificação de assinatura
+  const expected = `sha256=${crypto.createHmac('sha256', secret).update(rawBody).digest('hex')}`;
+  const a = Buffer.from(expected);
+  const b = Buffer.from(signature);
+  // timingSafeEqual exige buffers do mesmo tamanho
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+// Webhook do GitHub App — assinatura SEMPRE verificada (fail-closed)
 router.post('/github', express.raw({ type: 'application/json' }), async (req: Request, res: Response): Promise<any> => {
-  const signature = req.headers['x-hub-signature-256'] as string;
+  const signature = req.headers['x-hub-signature-256'] as string | undefined;
   const event = req.headers['x-github-event'] as string;
-  
-  // Verifica assinatura
-  const expected = `sha256=${crypto
-    .createHmac('sha256', GITHUB_WEBHOOK_SECRET)
-    .update(req.body)
-    .digest('hex')}`;
-  
-  if (signature !== expected) {
-    // Para simplificar o preview, se não tiver secret vamos deixar passar ou logar
-    console.warn("Invalid signature but ignoring for demo purposes. expected:", expected, "got:", signature);
-    // return res.status(401).json({ error: 'Assinatura inválida' });
+
+  if (!verifyGithubSignature(req.body as Buffer, signature)) {
+    return res.status(401).json({ error: 'Assinatura inválida' });
   }
 
   let payload;
@@ -66,15 +56,11 @@ router.post('/github', express.raw({ type: 'application/json' }), async (req: Re
         return res.status(200).json({ message: 'Projeto não mapeado, ignorado' });
       }
 
-      if (!project.tenantId) {
-          console.warn(`⚠️ Projeto não tem tenantId associado. Skipping...`);
-          return res.status(200).json({ message: 'Projeto sem tenant, ignorado' });
-      }
-
       // 2. Criar um registro de Scan
       const scan = await prisma.scan.create({
         data: {
           projectId: project.id,
+          tenantId: project.tenantId,
           status: 'pending',
           result: { prNumber, repoFullName }
         }
@@ -89,6 +75,7 @@ router.post('/github', express.raw({ type: 'application/json' }), async (req: Re
         tenantId: project.tenantId,
         repoFullName,
         prNumber,
+        headSha: pull_request.head?.sha,
         installationId: payload.installation?.id || Number(process.env.GITHUB_INSTALLATION_ID) || 0,
         repoUrl: repository.html_url,
       });

@@ -9,6 +9,7 @@ node_modules/
 # Build output
 dist/
 build/
+*.tsbuildinfo
 
 # Database
 dev.db
@@ -37,3 +38,7 @@ serviceAccountKey.json
 # Temporary files
 *.tmp
 uploads/
+
+# Playwright
+test-results/
+playwright-report/

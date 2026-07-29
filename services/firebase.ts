@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getAnalytics, isSupported } from 'firebase/analytics';
+import { getAnalytics, isSupported, type Analytics } from 'firebase/analytics';
 import rawConfig from '../firebase-applet-config.json';
 
 const envConfig = {
@@ -17,7 +17,7 @@ const envConfig = {
 const app = initializeApp(envConfig);
 export const auth = getAuth(app);
 
-export let analytics = null;
+export let analytics: Analytics | null = null;
 isSupported().then(supported => {
   if (supported) {
     analytics = getAnalytics(app);

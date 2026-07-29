@@ -55,7 +55,7 @@ router.post('/', async (req: Request, res: Response): Promise<any> => {
 router.put('/:id', async (req: Request, res: Response): Promise<any> => {
   const tenantId = req.user?.tenantId;
   if (!tenantId) return res.status(403).json({ error: 'Tenant context is missing.' });
-  const { id } = req.params;
+  const id = String(req.params.id);
   const updates = req.body;
 
   try {
@@ -79,7 +79,7 @@ router.put('/:id', async (req: Request, res: Response): Promise<any> => {
 router.delete('/:id', async (req: Request, res: Response): Promise<any> => {
   const tenantId = req.user?.tenantId;
   if (!tenantId) return res.status(403).json({ error: 'Tenant context is missing.' });
-  const { id } = req.params;
+  const id = String(req.params.id);
   
   try {
     const existing = await prisma.policy.findFirst({ where: { id, tenantId } });
@@ -108,7 +108,7 @@ router.post('/validate', async (req: Request, res: Response): Promise<any> => {
 router.post('/:id/evaluate', async (req: Request, res: Response): Promise<any> => {
   const tenantId = req.user?.tenantId;
   if (!tenantId) return res.status(403).json({ error: 'Tenant context is missing.' });
-  const { id } = req.params;
+  const id = String(req.params.id);
   const { resource } = req.body;
 
   try {

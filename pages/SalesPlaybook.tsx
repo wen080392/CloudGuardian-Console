@@ -189,7 +189,13 @@ const RoadmapCard = ({ phase, goal, desc }: any) => (
   </div>
 );
 
-const TemplateCard = ({ icon, title, text, onCopy, isCopied }: any) => (
+const TemplateCard = ({ icon, title, text, onCopy, isCopied }: {
+  icon: React.ReactNode;
+  title: string;
+  text: string;
+  onCopy: (text: string) => void;
+  isCopied: boolean;
+}) => (
   <div className="space-y-3 group">
     <div className="flex items-center justify-between">
        <div className="flex items-center gap-2">

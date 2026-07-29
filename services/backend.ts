@@ -12,7 +12,23 @@ const getApiKey = () => {
   }
 };
 
-const ai = new GoogleGenAI({ apiKey: getApiKey() });
+// Inicialização LAZY: `new GoogleGenAI({ apiKey: '' })` LANÇA no construtor.
+// Se instanciado no topo do módulo, derruba a app inteira em tela branca
+// quando VITE_GEMINI_API_KEY não está setada (a chave é opcional). Só
+// construímos o cliente quando há chave e sob demanda.
+let _ai: GoogleGenAI | null = null;
+const getAI = (): GoogleGenAI | null => {
+  if (_ai) return _ai;
+  const key = getApiKey();
+  if (!key) return null;
+  try {
+    _ai = new GoogleGenAI({ apiKey: key });
+    return _ai;
+  } catch (e) {
+    console.warn('Falha ao inicializar o cliente Gemini:', e);
+    return null;
+  }
+};
 
 class CloudGuardianBackend {
   // --- REAL API CALLS ---
@@ -161,10 +177,12 @@ class CloudGuardianBackend {
       return { ...event, id: `evt-${Date.now()}`, timestamp: new Date().toISOString() };
     }
   }
-  async getVulnerabilities() { 
+  async getVulnerabilities() {
     try {
       const response = await apiClient.get('/api/v1/vulnerabilities');
-      return response.data;
+      const list = Array.isArray(response.data) ? response.data : [];
+      // Retrocompat: o banco usa `resourceId`; a UI espera `resource`.
+      return list.map((v: any) => ({ ...v, resource: v.resource ?? v.resourceId ?? '' }));
     } catch (e) { return []; }
   }
   async setVulnerabilities(vulns: any[]) {
@@ -176,6 +194,8 @@ class CloudGuardianBackend {
   async suggestFix(vulnerability: string, codeContext: string): Promise<string> {
     const model = 'gemini-3-pro-preview';
     const prompt = `Provide a Terraform HCL code snippet to fix: "${vulnerability}". Context: \`\`\`hcl\n${codeContext}\n\`\`\` Return only the corrected HCL code block.`;
+    const ai = getAI();
+    if (!ai) return "/* IA indisponível: configure VITE_GEMINI_API_KEY */";
     try {
       const resp = await ai.models.generateContent({ model, contents: prompt });
       return resp.text || "/* AI Fix unavailable */";

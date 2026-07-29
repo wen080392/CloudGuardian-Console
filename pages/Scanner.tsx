@@ -57,17 +57,27 @@ export const Scanner: React.FC<ScannerProps> = ({ code, onCodeChange, onScanComp
 
   const handleApplyFixWithPR = async (vulnId: string, fixCode: string) => {
     setRemediationStatus('initializing');
-    
-    setTimeout(() => setRemediationStatus('patching'), 1000);
-    setTimeout(() => setRemediationStatus('pushing'), 2500);
+    const t1 = setTimeout(() => setRemediationStatus('patching'), 1000);
+    const t2 = setTimeout(() => setRemediationStatus('pushing'), 2500);
 
-    const result = await API.createRemediationPR(vulnId, fixCode);
-    
-    setTimeout(() => {
+    try {
+      const result = await API.createRemediationPR(vulnId, fixCode);
+      clearTimeout(t1);
+      clearTimeout(t2);
       setPrData(result);
       setRemediationStatus('completed');
       onApplyFix(vulnId, fixCode); // Aplica localmente também
-    }, 4000);
+    } catch (e) {
+      // Ex.: GITHUB_TOKEN ausente / 503. Não deixa a HUD travar carregando:
+      // aplica o patch localmente e encerra graciosamente.
+      console.error('Falha ao criar o PR de remediação:', e);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      onApplyFix(vulnId, fixCode);
+      setRemediationStatus('completed');
+      setPrData(null);
+      setTimeout(() => setRemediationStatus('idle'), 3000);
+    }
   };
 
   const applyBlueprint = (newCode: string) => {
@@ -224,10 +234,12 @@ resource "aws_s3_bucket_public_access_block" "block" {
             <div className="text-[9px] font-black text-primary-500 bg-primary-500/10 px-3 py-1 rounded-full uppercase tracking-widest">IA Real-time Monitoring</div>
           </div>
           
-          <div className="flex-1 relative bg-slate-950/40 p-8 overflow-y-auto custom-scrollbar">
-            <textarea 
-              value={code} 
-              onChange={(e) => onCodeChange(e.target.value)} 
+          {/* translate="no": o código Terraform nunca deve ser traduzido pelo
+              navegador — a tradução mangla os nós de texto e quebra o React */}
+          <div translate="no" className="notranslate flex-1 relative bg-slate-950/40 p-8 overflow-y-auto custom-scrollbar">
+            <textarea
+              value={code}
+              onChange={(e) => onCodeChange(e.target.value)}
               className="absolute inset-0 w-full h-full p-8 pl-16 bg-transparent text-transparent caret-white font-mono text-xs leading-6 resize-none focus:outline-none z-10"
               spellCheck={false}
               placeholder="Cole seu código Terraform HCL aqui..."

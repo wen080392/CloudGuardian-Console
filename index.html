@@ -1,11 +1,16 @@
 
 <!DOCTYPE html>
-<html lang="en">
+<!-- translate="no" + notranslate: extensões de tradução do navegador (ex.:
+     Google Translate) reescrevem nós de texto e quebram a reconciliação do
+     React ("Failed to execute 'insertBefore'...") ao re-renderizar áreas
+     densas de texto, como o editor de Terraform. lang=pt-BR reduz a oferta
+     automática de tradução (o conteúdo é majoritariamente português). -->
+<html lang="pt-BR" translate="no">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="google" content="notranslate" />
     <title>CloudGuardian Console</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <script>
       // Polyfill para evitar "process is not defined" no navegador
       window.process = {
@@ -14,88 +19,9 @@
           NODE_ENV: 'development'
         }
       };
-
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              slate: {
-                850: '#151e2d',
-                900: '#0b121f',
-                950: '#04070d',
-              },
-              primary: {
-                400: '#60a5fa',
-                500: '#3b82f6',
-                600: '#2563eb',
-              },
-            },
-            animation: {
-              'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-              'glow': 'glow 2s ease-in-out infinite alternate',
-            },
-            keyframes: {
-              glow: {
-                '0%': { boxShadow: '0 0 5px rgba(59, 130, 246, 0.2)' },
-                '100%': { boxShadow: '0 0 20px rgba(59, 130, 246, 0.6)' },
-              }
-            }
-          }
-        }
-      }
     </script>
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap');
-      
-      html {
-        scroll-behavior: smooth;
-      }
-
-      body {
-        background-color: #04070d;
-        color: #f8fafc;
-        font-family: 'Inter', sans-serif;
-        -webkit-font-smoothing: antialiased;
-      }
-
-      .glass {
-        background: rgba(15, 23, 42, 0.6);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.05);
-      }
-
-      .neo-card {
-        background: linear-gradient(145deg, rgba(30, 41, 59, 0.4), rgba(15, 23, 42, 0.1));
-        border: 1px solid rgba(255, 255, 255, 0.03);
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      }
-
-      .neo-card:hover {
-        border-color: rgba(59, 130, 246, 0.3);
-        transform: translateY(-2px);
-        box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.5);
-      }
-
-      /* Custom scrollbar */
-      ::-webkit-scrollbar {
-        width: 6px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #04070d;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #1e293b;
-        border-radius: 10px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #334155;
-      }
-
-      .text-glow {
-        text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
-      }
-    </style>
+    <!-- Tailwind agora é compilado via PostCSS/Vite (ver index.css e
+         tailwind.config.js) — sem dependência do CDN em runtime. -->
   </head>
   <body>
     <div id="root"></div>

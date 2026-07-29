@@ -71,7 +71,7 @@ export const Graph: React.FC<GraphProps> = ({ code, vulnerabilities, focusedReso
       y: n.id === 'THE_INTERNET' ? 300 : Math.random() * 600,
       vx: 0,
       vy: 0,
-      status: vulnerabilities.some(v => v.resource.includes(n.id)) ? 'risk' : 'healthy'
+      status: vulnerabilities.some(v => (v.resource || '').includes(n.id)) ? 'risk' : 'healthy'
     }));
 
     setNodes(simNodes);
@@ -240,7 +240,7 @@ export const Graph: React.FC<GraphProps> = ({ code, vulnerabilities, focusedReso
   };
 
   const selectedNodeData = nodes.find(n => n.id === selectedNodeId);
-  const selectedNodeVulns = vulnerabilities.filter(v => selectedNodeData && v.resource.includes(selectedNodeData.id));
+  const selectedNodeVulns = vulnerabilities.filter(v => selectedNodeData && (v.resource || '').includes(selectedNodeData.id));
 
   return (
     <div className="h-[calc(100vh-2rem)] flex flex-col p-6 overflow-hidden relative">
