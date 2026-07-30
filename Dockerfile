@@ -1,53 +1,53 @@
-# ---- Stage 1: Build Frontend & Prisma ----
+# ---- Stage 1: Build (frontend + bundle do backend + Prisma Client) ----
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Instalar dependências (incluindo devDependencies para o Vite)
+# Dependências completas (inclui devDependencies para Vite/esbuild/prisma CLI)
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# Copiar todo o código fonte
+# Código-fonte e geração
 COPY . .
-
-# Gerar Prisma Client (O container Linux vai compilar a engine correta)
 RUN npx prisma generate
-
-# Buildar o frontend (Gera a pasta /dist)
+# Gera dist/ (frontend) e dist/server.cjs (backend bundlado, packages external)
 RUN npm run build
 
-# ---- Stage 2: Production Runner ----
+# ---- Stage 2: Runner (produção) ----
 FROM node:20-alpine AS runner
 
 WORKDIR /app
-
-# Copiar package.json e instalar apenas dependências de produção
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
-
-# O tsx é necessário para rodar o backend em TypeScript diretamente
-RUN npm install tsx --no-save
-
-# Copiar os artefatos construídos
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-
-# Copiar o código do backend
-COPY server.ts ./
-COPY routes/ ./routes/
-COPY services/ ./services/
-COPY middleware/ ./middleware/
-COPY prisma/ ./prisma/
-
-# Criar diretório para relatórios locais (fallback)
-RUN mkdir -p ./uploads/reports
-
-# Variáveis de ambiente padrão para produção
 ENV NODE_ENV=production
 ENV PORT=3000
 
+# Chromium para a geração de PDF (puppeteer) — a imagem alpine não traz o
+# browser embutido; apontamos o puppeteer para o pacote do sistema.
+RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
+# Dependências de produção. --ignore-scripts evita o postinstall
+# (prisma generate) — o prisma CLI é devDep e o client gerado vem do builder.
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts
+
+# Artefatos buildados + Prisma Client já gerado no builder
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+# Schema + config para rodar migrações a partir do contêiner, se preciso
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+
+# Diretório de uploads (fallback local de relatórios) + permissões não-root
+RUN mkdir -p ./uploads/reports && chown -R node:node /app
+
+USER node
 EXPOSE 3000
 
-# Iniciar o servidor usando TSX
-CMD ["npx", "tsx", "server.ts"]
+# Healthcheck bate no /ping (endpoint leve, sem auth)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD wget -q --spider http://localhost:3000/ping || exit 1
+
+# Roda o backend BUNDLADO (não re-transpila TS em runtime)
+CMD ["node", "dist/server.cjs"]

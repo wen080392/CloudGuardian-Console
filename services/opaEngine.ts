@@ -1,30 +1,45 @@
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import util from 'util';
 import fs from 'fs/promises';
+import os from 'os';
+import path from 'path';
 import { prisma } from './db';
 
 const execPromise = util.promisify(exec);
+const execFilePromise = util.promisify(execFile);
+
+// Detecta "binário não encontrado" de forma robusta: via exec/shell isso vem
+// como exit 127 + "not found" (não ENOENT), então a checagem só por ENOENT
+// não pegava e bloqueava a criação de políticas onde o OPA não está instalado.
+function isBinaryMissing(error: any): boolean {
+  if (!error) return false;
+  if (error.code === 'ENOENT' || error.code === 127) return true;
+  const msg = `${error.message || ''} ${error.stderr || ''}`.toLowerCase();
+  return msg.includes('not found') || msg.includes('command not found') || msg.includes('no such file');
+}
 
 export class OPAEngine {
-  private opaPath = 'opa'; // assuming opa is installed and in path, or use simulation if not
+  private opaPath = process.env.OPA_PATH || 'opa'; // OPA no PATH, ou degrada se ausente
 
   // 1. Validar sintaxe da política (sem salvar ainda)
   async validatePolicy(regoCode: string) {
-    const tempFile = `/tmp/policy-${Date.now()}.rego`;
+    const tempFile = path.join(os.tmpdir(), `policy-${Date.now()}-${Math.random().toString(36).slice(2)}.rego`);
     try {
       await fs.writeFile(tempFile, regoCode);
-      const { stderr } = await execPromise(`${this.opaPath} check ${tempFile}`);
+      // execFile (sem shell) — argumentos separados, sem risco de injeção
+      const { stderr } = await execFilePromise(this.opaPath, ['check', tempFile], { timeout: 30_000 });
       if (stderr && !stderr.includes('No errors')) {
         return { valid: false, message: stderr };
       }
       return { valid: true, message: 'Política válida!' };
     } catch (error: any) {
-        // Fallback or simulate if opa not installed
-        if (error.code === 'ENOENT') {
-            console.warn("OPA binary not found. Skipping validation.");
-            return { valid: true, message: 'Política válida! (OPA mock)' };
-        }
-      return { valid: false, message: error.message };
+      // OPA não instalado → não bloqueia o CRUD; segue sem validação de sintaxe
+      if (isBinaryMissing(error)) {
+        console.warn('OPA binary não encontrado — pulando validação de sintaxe da política.');
+        return { valid: true, message: 'Política salva sem validação de sintaxe (OPA indisponível).' };
+      }
+      // Erro real de sintaxe reportado pelo OPA
+      return { valid: false, message: error.stderr || error.message };
     } finally {
       await fs.unlink(tempFile).catch(() => {});
     }
