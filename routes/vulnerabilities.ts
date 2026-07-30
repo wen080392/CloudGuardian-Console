@@ -153,10 +153,17 @@ router.post('/:id/remediate', validate(remediateSchema), async (req: Request, re
   } catch (error: any) {
     console.error('Erro na auto-remediação:', error);
     const message = String(error?.message ?? '');
+    // Integração não configurada → 503 (indisponível)
     if (message.includes('GITHUB_TOKEN')) {
       return res.status(503).json({ error: message });
     }
-    res.status(500).json({ error: 'Falha ao criar PR de remediação' });
+    // URL inválida → 400 (erro do cliente)
+    if (message.includes('inválida')) {
+      return res.status(400).json({ error: message });
+    }
+    // Falha na operação com o GitHub (repo inexistente, permissão, rede) →
+    // 502: é uma falha de upstream, não um erro interno opaco.
+    res.status(502).json({ error: 'Falha ao criar o PR de remediação no GitHub', detail: message });
   }
 });
 

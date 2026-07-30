@@ -57,6 +57,13 @@
 - [x] Correção de 2º crash de boot: cliente Gemini agora é lazy (chave opcional).
 - [x] Frontend migrado do Tailwind CDN para Tailwind compilado (PostCSS/Vite).
 
+### Pré-deploy / Contêiner (Fase 9) — ver `docs/PHASE9_PREDEPLOY.md`
+- [x] Dockerfile corrigido (build funcionava não; roda o bundle, não-root, healthcheck, Chromium).
+- [x] Teste de integração de TODAS as rotas contra Postgres real + job de CI dedicado.
+- [x] Bug corrigido: criação de política bloqueada sem OPA (agora degrada).
+- [x] Bug corrigido: auto-remediação com semântica de erro clara (503/400/502, não 500).
+- [ ] Build/push da imagem para um registry e provisionar serviços externos.
+
 ### Produto (Fase 4)
 - [x] Webhook Stripe com verificação de assinatura + persistência de `Tenant.plan`.
 - [x] Enforcement de limites por plano (projetos por tier).
