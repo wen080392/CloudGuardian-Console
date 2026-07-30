@@ -62,7 +62,8 @@
 - [x] Teste de integração de TODAS as rotas contra Postgres real + job de CI dedicado.
 - [x] Bug corrigido: criação de política bloqueada sem OPA (agora degrada).
 - [x] Bug corrigido: auto-remediação com semântica de erro clara (503/400/502, não 500).
-- [ ] Build/push da imagem para um registry e provisionar serviços externos.
+- [x] Workflow de build & push da imagem para o GHCR (`.github/workflows/docker.yml`) — ver `docs/DEPLOY.md`.
+- [ ] Provisionar serviços externos (Postgres gerenciado, Redis, GitHub App, AWS) e apontar o deploy.
 
 ### Produto (Fase 4)
 - [x] Webhook Stripe com verificação de assinatura + persistência de `Tenant.plan`.
