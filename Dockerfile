@@ -1,20 +1,22 @@
 # ---- Stage 1: Build (frontend + bundle do backend + Prisma Client) ----
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Dependências completas (inclui devDependencies para Vite/esbuild/prisma CLI)
+# Dependências completas (inclui devDependencies para Vite/esbuild/prisma CLI).
+# --ignore-scripts: o postinstall (prisma generate) precisa do schema, que
+# ainda não foi copiado aqui — geramos o client explicitamente após o COPY.
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 
-# Código-fonte e geração
+# Código-fonte e geração do Prisma Client (agora com o schema presente)
 COPY . .
 RUN npx prisma generate
 # Gera dist/ (frontend) e dist/server.cjs (backend bundlado, packages external)
 RUN npm run build
 
 # ---- Stage 2: Runner (produção) ----
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 
 WORKDIR /app
 ENV NODE_ENV=production
