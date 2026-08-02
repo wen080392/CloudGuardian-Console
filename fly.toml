@@ -1,0 +1,54 @@
+# Fly.io — deploy do CloudGuardian Console usando a imagem já publicada no GHCR.
+# Guia passo a passo: docs/FLY_DEPLOY.md
+#
+#   fly launch --no-deploy --copy-config   # cria o app a partir deste arquivo
+#   fly secrets set DATABASE_URL=... AWS_REGION=... AWS_KMS_KEY_ID=...
+#   fly deploy
+#
+# A migração roda como `release_command` (VM temporária, 1x por deploy, ANTES
+# das máquinas novas entrarem no ar) — o app NÃO migra no boot, evitando
+# corrida entre réplicas.
+
+app = "cloudguardian-console"
+primary_region = "gru"   # São Paulo. Troque se quiser (ex.: iad, gig, scl).
+
+[build]
+  # Imagem publicada pela CI (workflow docker.yml). Fixe por digest/tag imutável
+  # em produção — ex.: ...console:sha-66de9a9 — em vez de :latest.
+  image = "ghcr.io/wen080392/cloudguardian-console:latest"
+
+[deploy]
+  # Migração do banco antes de liberar a nova versão. Roda uma vez, com os
+  # mesmos secrets do app. Use "migrate deploy" se adotar migrations versionadas.
+  release_command = "npx prisma db push"
+  strategy = "rolling"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3000"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1   # >=1 para não dormir; suba p/ HA com múltiplas VMs
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+  # Healthcheck HTTP no endpoint leve /ping (sem auth) — mesmo alvo do
+  # HEALTHCHECK do Dockerfile.
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/ping"
+
+# Chromium (puppeteer, geração de PDF) precisa de memória — 512mb tende a OOM.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"
