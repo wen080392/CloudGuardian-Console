@@ -60,4 +60,16 @@ cron.schedule('0 3 * * *', async () => {
   }
 });
 
-console.log('⏰ Scheduler de relatórios e drift iniciado.');
+// Nurturing PLG: follow-up de conversão para leads da auditoria de 5 minutos
+// (diário às 10:00; no-op sem SMTP configurado).
+cron.schedule('0 10 * * *', async () => {
+  const { leadNurturingService } = await import('./leadNurturingService');
+  try {
+    const sent = await leadNurturingService.runFollowUpBatch();
+    if (sent > 0) console.log(`📧 Nurturing: ${sent} follow-up(s) de lead enviados.`);
+  } catch (e) {
+    console.error('Nurturing: lote de follow-up falhou:', e);
+  }
+});
+
+console.log('⏰ Scheduler de relatórios, drift e nurturing iniciado.');

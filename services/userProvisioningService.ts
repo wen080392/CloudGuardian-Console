@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from './db';
+import { instantAuditService } from './instantAuditService';
 
 export interface ProvisionInput {
   firebaseUid: string;
@@ -28,11 +29,13 @@ export async function provisionUser(input: ProvisionInput) {
     const byEmail = await prisma.user.findUnique({ where: { email } });
     if (byEmail) {
       // Usuário pré-existente (ex.: convidado por admin) — vincula o UID
-      return await prisma.user.update({
+      const linked = await prisma.user.update({
         where: { email },
         data: { firebaseUid },
         include: { tenant: true },
       });
+      await convertLeadsBestEffort(email, linked.tenantId);
+      return linked;
     }
 
     await prisma.tenant.create({
@@ -62,5 +65,22 @@ export async function provisionUser(input: ProvisionInput) {
   if (!user) {
     throw new Error(`Falha ao provisionar usuário para ${email}`);
   }
+
+  await convertLeadsBestEffort(email, user.tenantId);
+
   return user;
+}
+
+/**
+ * Conversão do funil PLG: se este email rodou a auditoria de 5 minutos como
+ * lead, atribui a conversão ao tenant provisionado. Best-effort — um erro
+ * aqui jamais pode impedir o login/registro.
+ */
+async function convertLeadsBestEffort(email: string, tenantId: string | null) {
+  if (!tenantId) return;
+  try {
+    await instantAuditService.markLeadConverted(email, tenantId);
+  } catch (e) {
+    console.error(`Falha ao marcar conversão de lead para ${email}:`, e);
+  }
 }

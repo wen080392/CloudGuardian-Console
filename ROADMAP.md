@@ -72,11 +72,17 @@
 ### PLG — Auditoria de 5 Minutos (Fase 7) — ver `docs/PHASE7_PLG.md`
 - [x] Endpoint público `POST /api/v1/audit/instant` (motor nativo + score + captura de lead).
 - [x] Relatório executivo em PDF por token; `reportService` sem custo mockado.
-- [ ] Seção "Auditoria grátis" na LandingPage + nurturing por email do lead.
-- [ ] Testes E2E (Playwright/Cypress) do funil e do fluxo Login → Scan → Fix.
+- [x] Seção "Auditoria grátis" na LandingPage (interativa, consumindo o endpoint).
+- [x] Nurturing por email do lead (`leadNurturingService`): relatório imediato +
+  follow-up D+3 via cron; degrada sem SMTP; integrado ao `notificationService`.
+- [x] Conversão lead → tenant: `provisionUser` marca `convertedTenantId` no
+  Lead/InstantAudit quando o email do lead cria conta (atribuição do funil).
+- [x] Testes E2E (Playwright) do funil e do fluxo Login → Scan → Fix (ver Fase 8).
 
 ## ⚠️ Pendências de deploy
 - Rodar migração do Prisma (novos campos: `Tenant.plan`, `BudgetAlert.createdAt`;
-  `tenantId` obrigatório em `User`/`Project`; índices novos).
+  `tenantId` obrigatório em `User`/`Project`; `Lead.nurtureStage`/`lastEmailAt`/
+  `convertedTenantId`; índices novos).
 - Variáveis obrigatórias em produção: `DATABASE_URL`, `AWS_REGION`, `AWS_KMS_KEY_ID`,
   `STRIPE_WEBHOOK_SECRET` (se billing ativo). Ver `.env.example`.
+- Para o nurturing PLG: `EMAIL_*` (SMTP) e `PUBLIC_BASE_URL` (links absolutos nos emails).

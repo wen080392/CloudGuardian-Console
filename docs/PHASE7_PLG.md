@@ -40,10 +40,36 @@ e `topFindings` — sem Prisma, cobertos por `tests/instantAudit.test.ts`. O
 hardcoded. Agora lê a `CostAnalysis` real mais recente do tenant (0 quando não
 há), no mesmo espírito das fases anteriores: nada de número fabricado.
 
+## Nurturing por email do lead
+
+`services/leadNurturingService.ts` fecha o loop do funil:
+
+- **Email imediato** pós-auditoria: score, contagem por severidade, link
+  absoluto do PDF (via `PUBLIC_BASE_URL`) e CTA de registro. Disparado pela
+  rota em background — nunca atrasa nem derruba a resposta da auditoria.
+- **Follow-up de conversão (D+3)**: cron diário (10:00, `schedulerService`)
+  envia um único follow-up a leads que receberam o relatório há 3+ dias e não
+  viraram cliente, e encerra a sequência.
+- **Estado da sequência** em `Lead.nurtureStage` (0 capturado → 1 relatório
+  enviado → 2 follow-up enviado) + `lastEmailAt`.
+- **Transporte**: `NotificationService.sendDirectEmail` (novo método público
+  reusando o SMTP `EMAIL_*`). Sem SMTP configurado, tudo é no-op — a auditoria
+  continua funcionando.
+- Conteúdo dos emails é gerado por funções puras (`buildReportEmail`,
+  `buildFollowUpEmail`), cobertas por `tests/leadNurturing.test.ts`.
+
+## Conversão lead → tenant
+
+Quando um email que rodou a auditoria cria conta, `provisionUser` chama
+`instantAuditService.markLeadConverted(email, tenantId)`: preenche
+`convertedTenantId` no `Lead` e nos seus `InstantAudit` (atribuição do funil)
+e tira o lead da sequência de nurturing. Best-effort: falha aqui nunca
+impede login/registro. Cobre também o caminho de usuário pré-convidado.
+
 ## Próximos passos (produto)
 
-- Frontend: seção "Auditoria grátis" na `LandingPage` consumindo o endpoint.
-- Sequência de nurturing por email para o lead capturado (integrar ao
-  `notificationService`).
-- Conversão lead → tenant (o campo `InstantAudit.convertedTenantId` já existe).
-- Testes E2E (Playwright) do funil: colar Terraform → ver score → baixar PDF.
+- ~~Frontend: seção "Auditoria grátis" na `LandingPage`~~ ✔ feito.
+- ~~Nurturing por email~~ ✔ feito (acima).
+- ~~Conversão lead → tenant~~ ✔ feito (acima).
+- ~~Testes E2E (Playwright) do funil~~ ✔ `e2e/instantAudit.spec.ts` (Fase 8).
+- Dashboard de funil (leads, conversões, score médio) para o time comercial.

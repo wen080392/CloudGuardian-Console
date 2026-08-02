@@ -13,10 +13,14 @@ interface MemUser {
   tenantId: string | null;
 }
 interface MemTenant { id: string; name: string; }
+interface MemLead { id: string; email: string; convertedTenantId: string | null; }
+interface MemAudit { id: string; leadId: string; convertedTenantId: string | null; }
 
 const db = {
   users: [] as MemUser[],
   tenants: [] as MemTenant[],
+  leads: [] as MemLead[],
+  audits: [] as MemAudit[],
 };
 let seq = 0;
 
@@ -52,6 +56,25 @@ vi.mock('../services/db', () => ({
         return withTenant(u);
       },
     },
+    // Conversão lead → tenant (funil PLG) tocada pelo provisionUser
+    lead: {
+      findMany: async ({ where }: any) =>
+        db.leads.filter(l => l.email === where.email && l.convertedTenantId === where.convertedTenantId),
+      updateMany: async ({ where, data }: any) => {
+        const targets = db.leads.filter(l => where.id.in.includes(l.id));
+        targets.forEach(l => Object.assign(l, data));
+        return { count: targets.length };
+      },
+    },
+    instantAudit: {
+      updateMany: async ({ where, data }: any) => {
+        const targets = db.audits.filter(
+          a => where.leadId.in.includes(a.leadId) && a.convertedTenantId === where.convertedTenantId
+        );
+        targets.forEach(a => Object.assign(a, data));
+        return { count: targets.length };
+      },
+    },
     tenant: {
       create: async ({ data }: any) => {
         const nested = data.users.create;
@@ -80,6 +103,8 @@ describe('provisionUser', () => {
   beforeEach(() => {
     db.users.length = 0;
     db.tenants.length = 0;
+    db.leads.length = 0;
+    db.audits.length = 0;
     seq = 0;
   });
 
@@ -121,5 +146,36 @@ describe('provisionUser', () => {
     expect(a.id).toBe(b.id);
     expect(db.tenants).toHaveLength(1);
     expect(db.users).toHaveLength(1);
+  });
+
+  it('converte lead do funil PLG quando o email cria conta', async () => {
+    db.leads.push({ id: 'lead-1', email: 'ana@acme.com', convertedTenantId: null });
+    db.audits.push({ id: 'audit-1', leadId: 'lead-1', convertedTenantId: null });
+
+    const user = await provisionUser({ firebaseUid: 'uid-1', email: 'ana@acme.com' });
+
+    expect(db.leads[0].convertedTenantId).toBe(user.tenantId);
+    expect(db.audits[0].convertedTenantId).toBe(user.tenantId);
+  });
+
+  it('não converte leads de outros emails', async () => {
+    db.leads.push({ id: 'lead-1', email: 'outra@pessoa.com', convertedTenantId: null });
+
+    await provisionUser({ firebaseUid: 'uid-1', email: 'ana@acme.com' });
+
+    expect(db.leads[0].convertedTenantId).toBeNull();
+  });
+
+  it('vínculo de usuário pré-existente também converte o lead', async () => {
+    db.tenants.push({ id: 't-existing', name: 'Empresa' });
+    db.users.push({
+      id: 'u-existing', firebaseUid: null, email: 'bob@corp.com',
+      name: 'Bob', role: 'viewer', tenantId: 't-existing',
+    });
+    db.leads.push({ id: 'lead-1', email: 'bob@corp.com', convertedTenantId: null });
+
+    await provisionUser({ firebaseUid: 'uid-9', email: 'bob@corp.com' });
+
+    expect(db.leads[0].convertedTenantId).toBe('t-existing');
   });
 });

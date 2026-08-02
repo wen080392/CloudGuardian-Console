@@ -3,6 +3,7 @@ import { rateLimit } from 'express-rate-limit';
 import { z } from 'zod';
 import { validate } from '../middleware/validate';
 import { instantAuditService } from '../services/instantAuditService';
+import { leadNurturingService } from '../services/leadNurturingService';
 import { PDFGenerator } from '../services/pdfGenerator';
 
 const router = Router();
@@ -31,13 +32,26 @@ router.post('/instant', auditLimiter, validate(instantAuditSchema), async (req: 
   const { email, company, terraform } = req.body;
   try {
     const result = await instantAuditService.run({ email, company, terraform });
+    const reportUrl = `/api/v1/audit/instant/${result.auditId}/report.pdf?token=${result.downloadToken}`;
+
+    // Nurturing: email com o relatório em background — nunca atrasa nem
+    // derruba a resposta da auditoria (sendAuditReportEmail não lança).
+    void leadNurturingService.sendAuditReportEmail({
+      leadId: result.leadId,
+      email,
+      company,
+      score: result.score,
+      summary: result.summary,
+      reportUrl,
+    });
+
     res.status(201).json({
       auditId: result.auditId,
       score: result.score,
       engine: result.engine,
       summary: result.summary,
       topFindings: result.topFindings,
-      reportUrl: `/api/v1/audit/instant/${result.auditId}/report.pdf?token=${result.downloadToken}`,
+      reportUrl,
     });
   } catch (error) {
     console.error('Erro na auditoria instantânea:', error);
