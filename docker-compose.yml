@@ -1,4 +1,8 @@
-version: '3.8'
+# Desenvolvimento: builda a imagem a partir do código local.
+# Para produção (imagem publicada no GHCR), use docker-compose.prod.yml.
+#
+#   cp .env.docker .env   (Windows: Copy-Item .env.docker .env)
+#   docker compose up -d --build
 
 services:
   postgres:
