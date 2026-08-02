@@ -19,6 +19,27 @@ export class NotificationService {
     }
   }
 
+  /** True quando SMTP está configurado (EMAIL_HOST/USER/PASS). */
+  emailConfigured(): boolean {
+    return this.transporter !== null;
+  }
+
+  /**
+   * Email direto para um destinatário arbitrário (ex.: lead sem conta),
+   * fora do fluxo de NotificationSetting por tenant. No-op sem SMTP.
+   * Lança em falha de envio — quem chama decide se degrada.
+   */
+  async sendDirectEmail(to: string, subject: string, html: string): Promise<boolean> {
+    if (!this.transporter) return false;
+    await this.transporter.sendMail({
+      from: process.env.EMAIL_FROM || 'notifications@cloudguardian.io',
+      to,
+      subject,
+      html,
+    });
+    return true;
+  }
+
   async sendNotification(tenantId: string, eventType: string, title: string, message: string, details?: any) {
     const settings = await prisma.notificationSetting.findUnique({
       where: { tenantId }

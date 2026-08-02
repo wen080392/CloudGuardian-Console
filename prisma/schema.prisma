@@ -259,14 +259,19 @@ model CloudCredential {
 
 // Funil PLG: lead que rodou a "auditoria de 5 minutos" sem conta
 model Lead {
-  id        String        @id @default(uuid())
-  email     String
-  company   String?
-  source    String        @default("instant-audit")
-  createdAt DateTime      @default(now())
-  audits    InstantAudit[]
+  id                String        @id @default(uuid())
+  email             String
+  company           String?
+  source            String        @default("instant-audit")
+  // Sequência de nurturing: 0 = capturado, 1 = relatório enviado, 2 = follow-up enviado
+  nurtureStage      Int           @default(0)
+  lastEmailAt       DateTime?
+  convertedTenantId String? // preenchido quando o lead cria conta (vira cliente)
+  createdAt         DateTime      @default(now())
+  audits            InstantAudit[]
 
   @@index([email])
+  @@index([nurtureStage, convertedTenantId])
 }
 
 model InstantAudit {
