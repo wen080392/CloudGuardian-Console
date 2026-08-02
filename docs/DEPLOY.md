@@ -20,12 +20,22 @@ docker run --rm -p 3000:3000 --env-file .env \
   ghcr.io/wen080392/cloudguardian-console:latest
 ```
 
-Ou o stack completo (app + Postgres + Redis) com `docker-compose.yml`:
+Ou o stack completo (app + Postgres + Redis). Para **produção**, use a imagem
+já publicada no GHCR via `docker-compose.prod.yml` (não builda do fonte):
 
 ```bash
 cp .env.example .env   # preencha os segredos
-docker compose up -d
+docker compose -f docker-compose.prod.yml run --rm migrate   # migração (1x)
+docker compose -f docker-compose.prod.yml up -d
 ```
+
+Para **desenvolvimento** (builda do fonte local), use o `docker-compose.yml`:
+
+```bash
+docker compose up -d --build
+```
+
+> Passo a passo completo de go-live (auth GHCR, smoke test, checklist): `docs/GO_LIVE.md`.
 
 ## Migração do banco (obrigatória antes do primeiro boot)
 

@@ -1,0 +1,69 @@
+# Produção — usa a imagem JÁ publicada no GHCR (não builda do fonte).
+#
+#   1. cp .env.example .env   # preencha os segredos de produção
+#   2. echo $GHCR_TOKEN | docker login ghcr.io -u <user> --password-stdin
+#   3. docker compose -f docker-compose.prod.yml run --rm migrate   # migração (1x)
+#   4. docker compose -f docker-compose.prod.yml up -d              # sobe o stack
+#
+# A migração é um serviço separado (perfil "tools") de propósito: o app NÃO
+# migra no boot para evitar corrida entre réplicas. Ver docs/DEPLOY.md.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cloudguardian}
+      POSTGRES_USER: ${POSTGRES_USER:-cloudguardian}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cloudguardian}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # Passo de migração — roda 1x e sai. `docker compose ... run --rm migrate`.
+  migrate:
+    image: ghcr.io/wen080392/cloudguardian-console:${IMAGE_TAG:-latest}
+    profiles: ["tools"]
+    env_file: .env
+    entrypoint: ["npx", "prisma", "db", "push"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  app:
+    image: ghcr.io/wen080392/cloudguardian-console:${IMAGE_TAG:-latest}
+    ports:
+      - "3000:3000"
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - uploads_data:/app/uploads
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads_data:
