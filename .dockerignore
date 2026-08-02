@@ -8,6 +8,13 @@ build
 .gitignore
 README.md
 docs
+.github
+tests
+e2e
+test-results
+playwright-report
+playwright.config.ts
+coverage
 .vscode
 *.swp
 *.swo
