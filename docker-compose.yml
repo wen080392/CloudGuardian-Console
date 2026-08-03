@@ -1,8 +1,9 @@
 # Desenvolvimento: builda a imagem a partir do código local.
 # Para produção (imagem publicada no GHCR), use docker-compose.prod.yml.
 #
-#   cp .env.docker .env   (Windows: Copy-Item .env.docker .env)
-#   docker compose up -d --build
+#   cp .env.docker .env            (Windows: Copy-Item .env.docker .env -Force)
+#   docker compose up -d --build   # sobe app + Postgres + Redis
+#   docker compose run --rm migrate  # cria as tabelas (1x, antes do 1º uso)
 
 services:
   postgres:
@@ -33,6 +34,17 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
+  # Cria/atualiza as tabelas no Postgres. Roda 1x e sai:
+  #   docker compose run --rm migrate
+  # O app NÃO migra no boot (evita corrida entre réplicas).
+  migrate:
+    build: .
+    env_file: .env
+    entrypoint: ["npx", "prisma", "db", "push"]
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   app:
     build: .

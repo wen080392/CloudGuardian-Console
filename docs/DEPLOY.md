@@ -32,7 +32,9 @@ docker compose -f docker-compose.prod.yml up -d
 Para **desenvolvimento** (builda do fonte local), use o `docker-compose.yml`:
 
 ```bash
+cp .env.docker .env              # .env pronto para local
 docker compose up -d --build
+docker compose run --rm migrate  # cria as tabelas (1x, antes do 1º uso)
 ```
 
 > Passo a passo completo de go-live (auth GHCR, smoke test, checklist): `docs/GO_LIVE.md`.
